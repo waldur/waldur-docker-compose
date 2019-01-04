@@ -132,7 +132,6 @@ services:
     networks:
       - waldur
     volumes:
-     #- 'waldur_mastermind_api:/bitnami'
      - "./waldur-mastermind-api:/bitnami"
     depends_on:
       waldur-mastermind-uwsgi:
@@ -177,9 +176,3 @@ volumes:
     driver: local
   waldur_events:
     driver: local
-#  waldur_logs_pipeline:
-#    external: true
-#  waldur_logs_settings:
-#    external: true
-#  waldur_mastermind_api:
-#    external: true

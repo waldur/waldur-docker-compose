@@ -12,4 +12,4 @@ services:
     depends_on:
       waldur-db:
         condition: service_healthy
-    command: initdb createadmin
+    command: waldur migrate --noinput
