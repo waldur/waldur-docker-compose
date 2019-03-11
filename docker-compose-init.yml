@@ -13,14 +13,3 @@ services:
       waldur-db:
         condition: service_healthy
     command: initdb createadmin
-
-  # Redis
-  waldur-queue_init:
-    image: 'bitnami/redis:latest'
-    networks:
-      - waldur
-    environment:
-      - ALLOW_EMPTY_PASSWORD=yes
-    volumes:
-      - 'waldur_queue:/bitnami'
-    command: bash -c "sed -i 's/^protected-mode yes/protected-mode no/g' /bitnami/redis/conf/redis.conf"

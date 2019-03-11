@@ -28,7 +28,8 @@ services:
     environment:
       - ALLOW_EMPTY_PASSWORD=yes
     volumes:
-      - 'waldur_queue:/bitnami'
+      #- 'waldur_queue:/bitnami'
+      - "./waldur-queue:/bitnami/redis/conf"
 
   # Elasticsearch
   waldur-events:
