@@ -1,0 +1,184 @@
+version: '2.2'
+
+services:
+  # PostgreSQL
+  waldur-db:
+    container_name: waldur-db
+    image: 'bitnami/postgresql:latest'
+    networks:
+      - waldur
+    environment:
+      - POSTGRESQL_USERNAME=waldur
+      - POSTGRESQL_PASSWORD
+      - POSTGRESQL_DATABASE=waldur
+    volumes:
+      - 'waldur_db:/bitnami'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U waldur"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+
+  # Redis
+  waldur-queue:
+    container_name: waldur-queue
+    image: 'bitnami/redis:latest'
+    networks:
+      - waldur
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    volumes:
+      - 'waldur_queue:/bitnami'
+
+  # Elasticsearch
+  waldur-events:
+    container_name: waldur-events
+    image: 'bitnami/elasticsearch:latest'
+    networks:
+      - waldur
+    volumes:
+      - 'waldur_events:/bitnami'
+    healthcheck:
+      test: ["CMD-SHELL", "curl localhost:9200"]
+
+  # Logstash
+  waldur-logs:
+    container_name: waldur-logs
+    image: 'docker.elastic.co/logstash/logstash:5.6.0'
+    networks:
+      - waldur
+    environment:
+      - XPACK_MONITORING_ENABLED=false
+    volumes:
+      - "./waldur-logs-config:/usr/share/logstash/config/"
+      - "./waldur-logs-pipeline:/usr/share/logstash/pipeline/"
+
+  # Postfix
+  waldur-smtp:
+    container_name: waldur-smtp
+    image: 'eeacms/postfix:latest'
+    networks:
+      - waldur
+    environment:
+      - MTP_HOST=demo.waldur.com
+
+  # Celery
+  waldur-mastermind-worker:
+    container_name: waldur-mastermind-worker
+    image: 'opennode/waldur-mastermind:latest'
+    networks:
+      - waldur
+    environment:
+      - GLOBAL_SECRET_KEY
+      - POSTGRESQL_PASSWORD
+    depends_on:
+      waldur-db:
+        condition: service_healthy
+      waldur-queue:
+        condition: service_started
+      waldur-events:
+        condition: service_started
+      waldur-logs:
+        condition: service_started
+    command: worker
+
+  # Celery-beat
+  waldur-mastermind-beat:
+    container_name: waldur-mastermind-beat
+    image: 'opennode/waldur-mastermind:latest'
+    networks:
+      - waldur
+    environment:
+      - GLOBAL_SECRET_KEY
+      - POSTGRESQL_PASSWORD
+    depends_on:
+      waldur-db:
+        condition: service_healthy
+      waldur-mastermind-worker:
+        condition: service_started
+    command: beat
+
+  # MasterMind uwsgi
+  waldur-mastermind-uwsgi:
+    container_name: waldur-mastermind-uwsgi
+    image: 'opennode/waldur-mastermind:latest'
+    networks:
+      - waldur
+    environment:
+      - GLOBAL_SECRET_KEY
+      - POSTGRESQL_PASSWORD
+    depends_on:
+      waldur-events:
+        condition: service_healthy
+      waldur-mastermind-worker:
+        condition: service_started
+      waldur-mastermind-beat:
+        condition: service_started
+      waldur-db:
+        condition: service_healthy
+      waldur-queue:
+        condition: service_started
+    command: mastermind
+
+  # MasterMind API
+  waldur-mastermind-api:
+    container_name: waldur-mastermind-api
+    image: 'bitnami/nginx:latest'
+    labels:
+      kompose.service.type: nodeport
+    ports:
+      - '8080:8080'
+    networks:
+      - waldur
+    volumes:
+     #- 'waldur_mastermind_api:/bitnami'
+     - "./waldur-mastermind-api:/bitnami"
+    depends_on:
+      waldur-mastermind-uwsgi:
+        condition: service_started
+      waldur-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl --silent --fail http://localhost:8080/ || exit 1"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+
+  # HomePort
+  waldur-homeport:
+    container_name: waldur-homeport
+    image: 'opennode/waldur-homeport:latest'
+    labels:
+      kompose.service.type: nodeport
+    ports:
+      - '80:80'
+    networks:
+      - waldur
+    depends_on:
+      waldur-mastermind-api:
+        condition: service_healthy
+      waldur-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl --silent --fail http://localhost/ || exit 1"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+
+networks:
+  waldur:
+    external: true
+
+volumes:
+  waldur_db:
+    driver: local
+  waldur_queue:
+    driver: local
+  waldur_events:
+    driver: local
+#  waldur_logs_pipeline:
+#    external: true
+#  waldur_logs_settings:
+#    external: true
+#  waldur_mastermind_api:
+#    external: true
