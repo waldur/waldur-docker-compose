@@ -1,12 +1,9 @@
 Table of Contents
 =================
 
-   * [Waldur Mastermind Docker Image](#waldur-mastermind-docker-image)
-      * [Image building instructions](#image-building-instructions)
-      * [Docker-compose usage instructions](#docker-compose-usage-instructions)
+   * [Docker-compose usage instructions](#docker-compose-usage-instructions)
 
-# Waldur Mastermind Docker Image
-## Docker-compose usage instructions
+# Docker-compose usage instructions
 
 Prerequisites:
 * at least 8GB RAM on Docker Host to run all containers
@@ -17,8 +14,8 @@ Prepare environment:
 # clone repo
 mkdir -p ~/repos
 cd ~/repos
-git clone git@github.com:opennode/waldur-mastermind-docker.git
-cd ~/repos/waldur-mastermind-docker
+git clone git@code.opennodecloud.com:waldur/docker-compose.git
+cd ~/repos/docker-compose
 
 # create rc file
 echo $( head -c32 /dev/urandom | base64 ) > ~/waldur_secret.key
@@ -35,6 +32,8 @@ docker network create waldur --driver bridge
 echo never > /sys/kernel/mm/transparent_hugepage/enabled
 sysctl -w vm.max_map_count=262144
 sysctl -w fs.file-max=65536
+
+chmod 666 waldur-logs-config/logstash.yml
 ```
 
 Booting up:
@@ -44,8 +43,11 @@ docker-compose -f docker-compose-init.yml -f docker-compose.yml up -d
 
 # verify
 docker-compose ps
-
 docker-compose run --rm waldur-mastermind-worker status
+
+# Create user
+docker-compose run --rm waldur-mastermind-worker waldur createstaffuser -u admin -p password
+
 ```
 
 Tearing down and cleaning up (deleting ALL volumes):

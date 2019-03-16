@@ -28,7 +28,6 @@ services:
     environment:
       - ALLOW_EMPTY_PASSWORD=yes
     volumes:
-      #- 'waldur_queue:/bitnami'
       - "./waldur-queue:/bitnami/redis/conf"
 
   # Elasticsearch
@@ -53,6 +52,9 @@ services:
     volumes:
       - "./waldur-logs-config:/usr/share/logstash/config/"
       - "./waldur-logs-pipeline:/usr/share/logstash/pipeline/"
+    depends_on:
+      waldur-events:
+        condition: service_healthy
 
   # Postfix
   waldur-smtp:
@@ -78,9 +80,14 @@ services:
       waldur-queue:
         condition: service_started
       waldur-events:
-        condition: service_started
+        condition: service_healthy
       waldur-logs:
         condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A waldur_core.server inspect ping"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
     command: worker
 
   # Celery-beat
@@ -154,6 +161,8 @@ services:
       - '80:80'
     networks:
       - waldur
+    volumes:
+      - "./waldur-homeport:/opnd"
     depends_on:
       waldur-mastermind-api:
         condition: service_healthy
