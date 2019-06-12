@@ -30,32 +30,6 @@ services:
     volumes:
       - "./waldur-queue:/bitnami/redis/conf"
 
-  # Elasticsearch
-  waldur-events:
-    container_name: waldur-events
-    image: 'bitnami/elasticsearch:latest'
-    networks:
-      - waldur
-    volumes:
-      - 'waldur_events:/bitnami'
-    healthcheck:
-      test: ["CMD-SHELL", "curl localhost:9200"]
-
-  # Logstash
-  waldur-logs:
-    container_name: waldur-logs
-    image: 'docker.elastic.co/logstash/logstash:5.6.0'
-    networks:
-      - waldur
-    environment:
-      - XPACK_MONITORING_ENABLED=false
-    volumes:
-      - "./waldur-logs-config:/usr/share/logstash/config/"
-      - "./waldur-logs-pipeline:/usr/share/logstash/pipeline/"
-    depends_on:
-      waldur-events:
-        condition: service_healthy
-
   # Postfix
   waldur-smtp:
     container_name: waldur-smtp
@@ -78,10 +52,6 @@ services:
       waldur-db:
         condition: service_healthy
       waldur-queue:
-        condition: service_started
-      waldur-events:
-        condition: service_healthy
-      waldur-logs:
         condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "celery -A waldur_core.server inspect ping"]
@@ -116,8 +86,6 @@ services:
       - GLOBAL_SECRET_KEY
       - POSTGRESQL_PASSWORD
     depends_on:
-      waldur-events:
-        condition: service_healthy
       waldur-mastermind-worker:
         condition: service_started
       waldur-mastermind-beat:
@@ -182,6 +150,4 @@ volumes:
   waldur_db:
     driver: local
   waldur_queue:
-    driver: local
-  waldur_events:
     driver: local
