@@ -32,8 +32,6 @@ docker network create waldur --driver bridge
 echo never > /sys/kernel/mm/transparent_hugepage/enabled
 sysctl -w vm.max_map_count=262144
 sysctl -w fs.file-max=65536
-
-chmod 666 waldur-logs-config/logstash.yml
 ```
 
 Booting up:
