@@ -11,8 +11,8 @@ Prerequisites:
 Prepare environment:
 ```bash
 # clone repo
-git clone git@code.opennodecloud.com:waldur/docker-compose.git
-cd docker-compose
+git clone https://github.com/opennode/waldur-docker-compose.git
+cd waldur-docker-compose
 
 # create waldur secret key
 echo $( head -c32 /dev/urandom | base64 )
