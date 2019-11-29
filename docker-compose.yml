@@ -4,15 +4,14 @@ services:
   # PostgreSQL
   waldur-db:
     container_name: waldur-db
-    image: 'bitnami/postgresql:latest'
-    networks:
-      - waldur
+    image: 'postgres:latest'
+    user: root
     environment:
-      - POSTGRESQL_USERNAME=waldur
-      - POSTGRESQL_PASSWORD
-      - POSTGRESQL_DATABASE=waldur
+      - POSTGRES_USER=waldur
+      - POSTGRES_PASSWORD=default
+      - POSTGRES_DB=waldur
     volumes:
-      - 'waldur_db:/bitnami'
+      - "./pgsql:/var/lib/postgresql/data"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U waldur"]
       interval: 30s
@@ -23,31 +22,32 @@ services:
   waldur-queue:
     container_name: waldur-queue
     image: 'bitnami/redis:latest'
-    networks:
-      - waldur
     environment:
-      - ALLOW_EMPTY_PASSWORD=yes
-    volumes:
-      - "./waldur-queue:/bitnami/redis/conf"
+      - REDIS_PASSWORD=waldur-redis-pass
 
-  # Postfix
-  waldur-smtp:
-    container_name: waldur-smtp
-    image: 'eeacms/postfix:latest'
-    networks:
-      - waldur
-    environment:
-      - MTP_HOST=demo.waldur.com
+  # DB migration
+  waldur-mastermind-db-migration:
+    container_name: waldur-mastermind-db-migration
+    image: 'opennode/waldur-mastermind:latest'
+    volumes:
+      - "./config/waldur-mastermind:/etc/waldur:ro"
+      - "./waldur_libs:/var/lib/waldur"
+      - "./waldur_logs:/var/log/waldur"
+    depends_on:
+      waldur-db:
+        condition: service_healthy
+      waldur-queue:
+        condition: service_started
+    command: initdb
 
   # Celery
   waldur-mastermind-worker:
     container_name: waldur-mastermind-worker
     image: 'opennode/waldur-mastermind:latest'
-    networks:
-      - waldur
-    environment:
-      - GLOBAL_SECRET_KEY
-      - POSTGRESQL_PASSWORD
+    volumes:
+      - "./config/waldur-mastermind:/etc/waldur:ro"
+      - "./waldur_libs:/var/lib/waldur"
+      - "./waldur_logs:/var/log/waldur"
     depends_on:
       waldur-db:
         condition: service_healthy
@@ -64,11 +64,10 @@ services:
   waldur-mastermind-beat:
     container_name: waldur-mastermind-beat
     image: 'opennode/waldur-mastermind:latest'
-    networks:
-      - waldur
-    environment:
-      - GLOBAL_SECRET_KEY
-      - POSTGRESQL_PASSWORD
+    volumes:
+      - "./config/waldur-mastermind:/etc/waldur:ro"
+      - "./waldur_libs:/var/lib/waldur"
+      - "./waldur_logs:/var/log/waldur"
     depends_on:
       waldur-db:
         condition: service_healthy
@@ -80,11 +79,12 @@ services:
   waldur-mastermind-uwsgi:
     container_name: waldur-mastermind-uwsgi
     image: 'opennode/waldur-mastermind:latest'
-    networks:
-      - waldur
-    environment:
-      - GLOBAL_SECRET_KEY
-      - POSTGRESQL_PASSWORD
+    ports:
+     - "8000:8000"
+    volumes:
+      - "./config/waldur-mastermind:/etc/waldur:ro"
+      - "./waldur_libs:/var/lib/waldur"
+      - "./waldur_logs:/var/log/waldur"
     depends_on:
       waldur-mastermind-worker:
         condition: service_started
@@ -96,58 +96,22 @@ services:
         condition: service_started
     command: mastermind
 
-  # MasterMind API
-  waldur-mastermind-api:
-    container_name: waldur-mastermind-api
-    image: 'bitnami/nginx:latest'
-    labels:
-      kompose.service.type: nodeport
-    ports:
-      - '8080:8080'
-    networks:
-      - waldur
-    volumes:
-     - "./waldur-mastermind-api:/bitnami"
-    depends_on:
-      waldur-mastermind-uwsgi:
-        condition: service_started
-      waldur-db:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "curl --silent --fail http://localhost:8080/ || exit 1"]
-      interval: 30s
-      timeout: 30s
-      retries: 3
-
   # HomePort
   waldur-homeport:
     container_name: waldur-homeport
     image: 'opennode/waldur-homeport:latest'
-    labels:
-      kompose.service.type: nodeport
     ports:
       - '80:80'
-    networks:
-      - waldur
     volumes:
-      - "./waldur-homeport:/opnd"
+      - "./config/waldur-homeport/config.json:/opnd/config.json"
+      - "./config/waldur-homeport/nginx.conf:/etc/nginx/nginx.conf"
     depends_on:
-      waldur-mastermind-api:
-        condition: service_healthy
       waldur-db:
         condition: service_healthy
+      waldur-mastermind-uwsgi:
+        condition: service_started
     healthcheck:
-      test: ["CMD-SHELL", "curl --silent --fail http://localhost/ || exit 1"]
+      test: ["CMD-SHELL", "curl --silent --fail http://waldur-homeport/ || exit 1"]
       interval: 30s
       timeout: 30s
       retries: 3
-
-networks:
-  waldur:
-    external: true
-
-volumes:
-  waldur_db:
-    driver: local
-  waldur_queue:
-    driver: local
