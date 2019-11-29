@@ -31,10 +31,17 @@ docker exec -t waldur-mastermind-worker status
 
 # Create user
 docker exec -t waldur-mastermind-worker waldur createstaffuser -u admin -p password
-
 ```
+
+Waldur HomePort will be accessible on http://localhost. API will listen on http://localhost:8000
 
 Tearing down and cleaning up:
 ```bash
 docker-compose down
+```
+
+Upgrade:
+```bash
+docker-compose pull
+docker-compose restart
 ```
