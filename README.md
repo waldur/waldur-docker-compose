@@ -7,7 +7,6 @@ Table of Contents
 
 Prerequisites:
 * at least 8GB RAM on Docker Host to run all containers
-* local hostname resolution in laptop /etc/hosts: waldur-mastermind-api -> your_docker_host
 
 Prepare environment:
 ```bash
