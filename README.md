@@ -30,7 +30,7 @@ docker-compose ps
 docker exec -t waldur-mastermind-worker status
 
 # Create user
-docker exec -t waldur-mastermind-worker waldur createstaffuser -u admin -p password
+docker exec -t waldur-mastermind-worker waldur createstaffuser -u admin -p password -e admin@example.com
 
 ```
 
