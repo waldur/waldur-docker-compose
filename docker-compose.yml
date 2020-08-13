@@ -29,8 +29,13 @@ services:
   waldur-mastermind-db-migration:
     container_name: waldur-mastermind-db-migration
     image: 'opennode/waldur-mastermind:latest'
+    environment:
+      - POSTGRESQL_HOST=waldur-db
+      - POSTGRESQL_PASSWORD=default
+      - REDIS_HOST=waldur-queue
+      - REDIS_PASSWORD=waldur-redis-pass
     volumes:
-      - "./config/waldur-mastermind:/etc/waldur:ro"
+      - "./config/waldur-mastermind/override.conf.py:/etc/waldur/override.conf.py:ro"
       - "./waldur_libs:/var/lib/waldur"
       - "./waldur_logs:/var/log/waldur"
     depends_on:
@@ -44,8 +49,15 @@ services:
   waldur-mastermind-worker:
     container_name: waldur-mastermind-worker
     image: 'opennode/waldur-mastermind:latest'
+    environment:
+      - POSTGRESQL_HOST=waldur-db
+      - POSTGRESQL_PASSWORD=default
+      - REDIS_HOST=waldur-queue
+      - REDIS_PASSWORD=waldur-redis-pass
+      - LOGGING_LOG_FILE=/var/log/waldur/core.log
+      - EVENTS_LOG_FILE=/var/log/waldur/events.log
     volumes:
-      - "./config/waldur-mastermind:/etc/waldur:ro"
+      - "./config/waldur-mastermind/override.conf.py:/etc/waldur/override.conf.py:ro"
       - "./waldur_libs:/var/lib/waldur"
       - "./waldur_logs:/var/log/waldur"
     depends_on:
@@ -64,8 +76,15 @@ services:
   waldur-mastermind-beat:
     container_name: waldur-mastermind-beat
     image: 'opennode/waldur-mastermind:latest'
+    environment:
+      - POSTGRESQL_HOST=waldur-db
+      - POSTGRESQL_PASSWORD=default
+      - REDIS_HOST=waldur-queue
+      - REDIS_PASSWORD=waldur-redis-pass
+      - LOGGING_LOG_FILE=/var/log/waldur/core.log
+      - EVENTS_LOG_FILE=/var/log/waldur/events.log
     volumes:
-      - "./config/waldur-mastermind:/etc/waldur:ro"
+      - "./config/waldur-mastermind/override.conf.py:/etc/waldur/override.conf.py:ro"
       - "./waldur_libs:/var/lib/waldur"
       - "./waldur_logs:/var/log/waldur"
     depends_on:
@@ -79,10 +98,17 @@ services:
   waldur-mastermind-uwsgi:
     container_name: waldur-mastermind-uwsgi
     image: 'opennode/waldur-mastermind:latest'
+    environment:
+      - POSTGRESQL_HOST=waldur-db
+      - POSTGRESQL_PASSWORD=default
+      - REDIS_HOST=waldur-queue
+      - REDIS_PASSWORD=waldur-redis-pass
+      - LOGGING_LOG_FILE=/var/log/waldur/core.log
+      - EVENTS_LOG_FILE=/var/log/waldur/events.log
     ports:
      - "8000:8000"
     volumes:
-      - "./config/waldur-mastermind:/etc/waldur:ro"
+      - "./config/waldur-mastermind/override.conf.py:/etc/waldur/override.conf.py:ro"
       - "./waldur_libs:/var/lib/waldur"
       - "./waldur_logs:/var/log/waldur"
     depends_on:
