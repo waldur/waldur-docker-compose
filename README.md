@@ -18,7 +18,9 @@ cd waldur-docker-compose
 echo $( head -c32 /dev/urandom | base64 )
 ```
 
-Put generated key to config/waldur-mastermind/core.ini secret_key variable 
+Put generated key to `config/waldur-mastermind/override.conf.py`, `SECRET_KEY` variable or inject into `GLOBAL_SECRET_KEY` env var for `waldur-mastermind-db-migration`, `waldur-mastermind-worker`, `waldur-mastermind-beat` and `waldur-mastermind-uwsgi`.
+
+**NB**: variable in the `override.conf.py` has higher precedence over env vars.
 
 Booting up:
 ```bash
