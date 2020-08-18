@@ -36,6 +36,7 @@ services:
       - REDIS_PASSWORD=waldur-redis-pass
     volumes:
       - "./config/waldur-mastermind/override.conf.py:/etc/waldur/override.conf.py:ro"
+      - "./config/waldur-mastermind/uwsgi.ini:/etc/waldur/uwsgi.ini:ro"
       - "./waldur_libs:/var/lib/waldur"
       - "./waldur_logs:/var/log/waldur"
     depends_on:
@@ -58,6 +59,7 @@ services:
       - EVENTS_LOG_FILE=/var/log/waldur/events.log
     volumes:
       - "./config/waldur-mastermind/override.conf.py:/etc/waldur/override.conf.py:ro"
+      - "./config/waldur-mastermind/uwsgi.ini:/etc/waldur/uwsgi.ini:ro"
       - "./waldur_libs:/var/lib/waldur"
       - "./waldur_logs:/var/log/waldur"
     depends_on:
@@ -85,6 +87,7 @@ services:
       - EVENTS_LOG_FILE=/var/log/waldur/events.log
     volumes:
       - "./config/waldur-mastermind/override.conf.py:/etc/waldur/override.conf.py:ro"
+      - "./config/waldur-mastermind/uwsgi.ini:/etc/waldur/uwsgi.ini:ro"
       - "./waldur_libs:/var/lib/waldur"
       - "./waldur_logs:/var/log/waldur"
     depends_on:
@@ -109,6 +112,7 @@ services:
      - "8000:8000"
     volumes:
       - "./config/waldur-mastermind/override.conf.py:/etc/waldur/override.conf.py:ro"
+      - "./config/waldur-mastermind/uwsgi.ini:/etc/waldur/uwsgi.ini:ro"
       - "./waldur_libs:/var/lib/waldur"
       - "./waldur_logs:/var/log/waldur"
     depends_on:
