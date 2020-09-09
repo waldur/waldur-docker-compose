@@ -1,0 +1,27 @@
+stages:
+  - test
+
+Test compose configuration:
+  services:
+    - "docker:19.03.12-dind"
+  interruptible: true
+  variables:
+    DOCKER_DRIVER: overlay2
+    COMPOSE_INTERACTIVE_NO_CLI: 1
+  script:
+    - echo "SECRET_KEY = '$( head -c32 /dev/urandom | base64 )'" >> config/waldur-mastermind/override.conf.py
+    - docker-compose up -d
+    - echo "Wait until all containers will be available and migrations are run"
+    - sleep 100
+    - docker-compose ps
+    - docker-compose exec waldur-mastermind-worker status
+    - docker-compose exec waldur-mastermind-worker waldur createstaffuser -u admin -p password -e admin@example.com
+    # Using `docker` host due to docker networking model:
+    # Accessing directly to the `dind` service
+    - curl -i http://docker | grep 200
+    - curl -i http://docker/api/ | grep 401
+  before_script:
+    - apk update
+    - apk add py-pip python3-dev libffi-dev openssl-dev gcc libc-dev make curl
+    - pip install docker-compose
+    - docker info
