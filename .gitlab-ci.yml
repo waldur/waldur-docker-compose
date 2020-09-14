@@ -5,6 +5,16 @@ Test compose configuration:
   services:
     - "docker:19.03.12-dind"
   interruptible: true
+  rules:
+    # If triggered from another pipeline
+    - if: $TRIGGER_PROJECT_NAME
+    # If changes are pushed to `develop` or `master` branch
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_COMMIT_BRANCH == "master"'
+    # If associated merge request exists
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    # If triggered by a schedule
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
   variables:
     DOCKER_DRIVER: overlay2
     COMPOSE_INTERACTIVE_NO_CLI: 1
