@@ -12,7 +12,8 @@ variables:
 
 Test compose configuration:
   services:
-    - "docker:19.03.12-dind"
+    - name: "docker:19.03.12-dind"
+      command: ["--mtu=1400"]
   interruptible: true
   rules:
     # If triggered from another pipeline
