@@ -36,7 +36,6 @@ services:
       - REDIS_PASSWORD=waldur-redis-pass
     volumes:
       - "./config/waldur-mastermind/override.conf.py:/etc/waldur/override.conf.py:ro"
-      - "./config/waldur-mastermind/uwsgi.ini:/etc/waldur/uwsgi.ini:ro"
       - "./waldur_libs:/var/lib/waldur"
       - "./waldur_logs:/var/log/waldur"
     depends_on:
@@ -59,7 +58,6 @@ services:
       - EVENTS_LOG_FILE=/var/log/waldur/events.log
     volumes:
       - "./config/waldur-mastermind/override.conf.py:/etc/waldur/override.conf.py:ro"
-      - "./config/waldur-mastermind/uwsgi.ini:/etc/waldur/uwsgi.ini:ro"
       - "./waldur_libs:/var/lib/waldur"
       - "./waldur_logs:/var/log/waldur"
     depends_on:
@@ -87,7 +85,6 @@ services:
       - EVENTS_LOG_FILE=/var/log/waldur/events.log
     volumes:
       - "./config/waldur-mastermind/override.conf.py:/etc/waldur/override.conf.py:ro"
-      - "./config/waldur-mastermind/uwsgi.ini:/etc/waldur/uwsgi.ini:ro"
       - "./waldur_libs:/var/lib/waldur"
       - "./waldur_logs:/var/log/waldur"
     depends_on:
@@ -97,9 +94,9 @@ services:
         condition: service_started
     command: beat
 
-  # MasterMind uwsgi
-  waldur-mastermind-uwsgi:
-    container_name: waldur-mastermind-uwsgi
+  # MasterMind API
+  waldur-mastermind-api:
+    container_name: waldur-mastermind-api
     image: 'opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
     environment:
       - POSTGRESQL_HOST=waldur-db
@@ -109,10 +106,9 @@ services:
       - LOGGING_LOG_FILE=/var/log/waldur/core.log
       - EVENTS_LOG_FILE=/var/log/waldur/events.log
     ports:
-     - "8000:8000"
+     - "8080:8080"
     volumes:
       - "./config/waldur-mastermind/override.conf.py:/etc/waldur/override.conf.py:ro"
-      - "./config/waldur-mastermind/uwsgi.ini:/etc/waldur/uwsgi.ini:ro"
       - "./waldur_libs:/var/lib/waldur"
       - "./waldur_logs:/var/log/waldur"
     depends_on:
@@ -138,7 +134,7 @@ services:
     depends_on:
       waldur-db:
         condition: service_healthy
-      waldur-mastermind-uwsgi:
+      waldur-mastermind-api:
         condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "curl --silent --fail http://waldur-homeport/ || exit 1"]
