@@ -1,5 +1,22 @@
-version: '2.2'
+version: '2.4'
 
+x-mastermind-volumes:
+  &default-mastermind-volumes
+  - ${CONFIG_FOLDER}/waldur-mastermind/override.conf.py:/etc/waldur/override.conf.py
+  - ${LOG_FOLDER}:/var/log/waldur
+  - ${LIB_FOLDER}:/var/lib/waldur
+
+x-mastermind-environment:
+  &default-mastermind-env
+  - GLOBAL_SECRET_KEY=${GLOBAL_SECRET_KEY}
+  - POSTGRESQL_HOST=waldur-db
+  - POSTGRESQL_PASSWORD=${POSTGRESQL_PASSWORD}
+  - REDIS_HOST=waldur-queue
+  - REDIS_PASSWORD=${REDIS_PASSWORD}
+  - LOGGING_LOG_FILE=/var/log/waldur/core.log
+  - EVENTS_LOG_FILE=/var/log/waldur/events.log
+  - GLOBAL_DEFAULT_FROM_EMAIL=${GLOBAL_DEFAULT_FROM_EMAIL}
+  - SENTRY_DSN=${SENTRY_DSN}
 services:
   # PostgreSQL
   waldur-db:
@@ -8,7 +25,7 @@ services:
     user: root
     environment:
       - POSTGRES_USER=waldur
-      - POSTGRES_PASSWORD=default
+      - POSTGRES_PASSWORD=${POSTGRESQL_PASSWORD}
       - POSTGRES_DB=waldur
     volumes:
       - "./pgsql:/var/lib/postgresql/data"
@@ -29,15 +46,8 @@ services:
   waldur-mastermind-db-migration:
     container_name: waldur-mastermind-db-migration
     image: 'opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
-    environment:
-      - POSTGRESQL_HOST=waldur-db
-      - POSTGRESQL_PASSWORD=default
-      - REDIS_HOST=waldur-queue
-      - REDIS_PASSWORD=waldur-redis-pass
-    volumes:
-      - "./config/waldur-mastermind/override.conf.py:/etc/waldur/override.conf.py:ro"
-      - "./waldur_libs:/var/lib/waldur"
-      - "./waldur_logs:/var/log/waldur"
+    environment: *default-mastermind-env
+    volumes: *default-mastermind-volumes
     depends_on:
       waldur-db:
         condition: service_healthy
@@ -49,17 +59,8 @@ services:
   waldur-mastermind-worker:
     container_name: waldur-mastermind-worker
     image: 'opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
-    environment:
-      - POSTGRESQL_HOST=waldur-db
-      - POSTGRESQL_PASSWORD=default
-      - REDIS_HOST=waldur-queue
-      - REDIS_PASSWORD=waldur-redis-pass
-      - LOGGING_LOG_FILE=/var/log/waldur/core.log
-      - EVENTS_LOG_FILE=/var/log/waldur/events.log
-    volumes:
-      - "./config/waldur-mastermind/override.conf.py:/etc/waldur/override.conf.py:ro"
-      - "./waldur_libs:/var/lib/waldur"
-      - "./waldur_logs:/var/log/waldur"
+    environment: *default-mastermind-env
+    volumes: *default-mastermind-volumes
     depends_on:
       waldur-db:
         condition: service_healthy
@@ -76,17 +77,8 @@ services:
   waldur-mastermind-beat:
     container_name: waldur-mastermind-beat
     image: 'opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
-    environment:
-      - POSTGRESQL_HOST=waldur-db
-      - POSTGRESQL_PASSWORD=default
-      - REDIS_HOST=waldur-queue
-      - REDIS_PASSWORD=waldur-redis-pass
-      - LOGGING_LOG_FILE=/var/log/waldur/core.log
-      - EVENTS_LOG_FILE=/var/log/waldur/events.log
-    volumes:
-      - "./config/waldur-mastermind/override.conf.py:/etc/waldur/override.conf.py:ro"
-      - "./waldur_libs:/var/lib/waldur"
-      - "./waldur_logs:/var/log/waldur"
+    environment: *default-mastermind-env
+    volumes: *default-mastermind-volumes
     depends_on:
       waldur-db:
         condition: service_healthy
@@ -98,19 +90,10 @@ services:
   waldur-mastermind-api:
     container_name: waldur-mastermind-api
     image: 'opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
-    environment:
-      - POSTGRESQL_HOST=waldur-db
-      - POSTGRESQL_PASSWORD=default
-      - REDIS_HOST=waldur-queue
-      - REDIS_PASSWORD=waldur-redis-pass
-      - LOGGING_LOG_FILE=/var/log/waldur/core.log
-      - EVENTS_LOG_FILE=/var/log/waldur/events.log
+    environment: *default-mastermind-env
     ports:
      - "8080:8080"
-    volumes:
-      - "./config/waldur-mastermind/override.conf.py:/etc/waldur/override.conf.py:ro"
-      - "./waldur_libs:/var/lib/waldur"
-      - "./waldur_logs:/var/log/waldur"
+    volumes: *default-mastermind-volumes
     depends_on:
       waldur-mastermind-worker:
         condition: service_started
@@ -129,8 +112,8 @@ services:
     ports:
       - '80:80'
     volumes:
-      - "./config/waldur-homeport/config.json:/opnd/config.json"
-      - "./config/waldur-homeport/nginx.conf:/etc/nginx/nginx.conf"
+      - "${CONFIG_FOLDER}/waldur-homeport/config.json:/opnd/config.json"
+      - "${CONFIG_FOLDER}/waldur-homeport/nginx.conf:/etc/nginx/nginx.conf"
     depends_on:
       waldur-db:
         condition: service_healthy

@@ -13,14 +13,7 @@ Prepare environment:
 # clone repo
 git clone https://github.com/opennode/waldur-docker-compose.git
 cd waldur-docker-compose
-
-# create waldur secret key
-echo $( head -c32 /dev/urandom | base64 )
 ```
-
-Put generated key to `config/waldur-mastermind/override.conf.py`, `SECRET_KEY` variable or inject into `GLOBAL_SECRET_KEY` env var for `waldur-mastermind-db-migration`, `waldur-mastermind-worker`, `waldur-mastermind-beat` and `waldur-mastermind-uwsgi`.
-
-**NB**: variable in the `override.conf.py` has higher precedence over env vars.
 
 Booting up:
 ```bash
@@ -35,7 +28,7 @@ docker exec -t waldur-mastermind-worker status
 docker exec -t waldur-mastermind-worker waldur createstaffuser -u admin -p password -e admin@example.com
 ```
 
-Waldur HomePort will be accessible on http://localhost. API will listen on http://localhost:8000
+Waldur HomePort will be accessible on http://localhost. API will listen on http://localhost:8080
 
 Tearing down and cleaning up:
 ```bash
