@@ -1,15 +1,3 @@
-# This file is managed by Ansible, manual changes will be overwritten.
-#
-# Configuration for Waldur plugins
-#
-# Django
-#
-
-#
-# waldur-core
-# https://opennode.atlassian.net/wiki/display/WD/MasterMind+configuration#MasterMindconfiguration-Additionalsettings
-
-
 WALDUR_CORE['AUTHENTICATION_METHODS'] = ["LOCAL_SIGNIN"]
 
 WALDUR_CORE['SITE_NAME'] = 'test'
@@ -26,5 +14,3 @@ WALDUR_CORE['COMPANY_TYPES'] = ()
 WALDUR_CORE['ENABLE_GEOIP'] = False
 
 WALDUR_CORE['ALLOW_SIGNUP_WITHOUT_INVITATION'] = False
-
-SECRET_KEY = 'changemedemoonly'
