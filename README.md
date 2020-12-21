@@ -13,6 +13,8 @@ Prepare environment:
 # clone repo
 git clone https://github.com/opennode/waldur-docker-compose.git
 cd waldur-docker-compose
+# setup settings
+cp .env.example .env
 ```
 
 Booting up:

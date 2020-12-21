@@ -29,7 +29,7 @@ Test compose configuration:
     DOCKER_DRIVER: overlay2
     COMPOSE_INTERACTIVE_NO_CLI: 1
   script:
-    - echo "SECRET_KEY = '$( head -c32 /dev/urandom | base64 )'" >> config/waldur-mastermind/override.conf.py
+    - cp -vf .env.example .env
     - docker-compose up waldur-mastermind-db-migration
     - docker-compose up -d
     - docker-compose ps
