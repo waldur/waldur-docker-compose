@@ -1,11 +1,5 @@
 version: '2.4'
 
-x-mastermind-volumes:
-  &default-mastermind-volumes
-  - ${CONFIG_FOLDER}/waldur-mastermind/override.conf.py:/etc/waldur/override.conf.py
-  - ${LOG_FOLDER}:/var/log/waldur
-  - ${LIB_FOLDER}:/var/lib/waldur
-
 x-mastermind-environment:
   &default-mastermind-env
   - GLOBAL_SECRET_KEY=${GLOBAL_SECRET_KEY}
@@ -17,6 +11,13 @@ x-mastermind-environment:
   - EVENTS_LOG_FILE=/var/log/waldur/events.log
   - GLOBAL_DEFAULT_FROM_EMAIL=${GLOBAL_DEFAULT_FROM_EMAIL}
   - SENTRY_DSN=${SENTRY_DSN}
+
+x-mastermind-volumes:
+  &default-mastermind-volumes
+  - ${CONFIG_FOLDER}/waldur-mastermind/override.conf.py:/etc/waldur/override.conf.py
+  - ${LOG_FOLDER}:/var/log/waldur
+  - ${LIB_FOLDER}:/var/lib/waldur
+
 services:
   # PostgreSQL
   waldur-db:
@@ -111,9 +112,8 @@ services:
     image: 'opennode/waldur-homeport:${WALDUR_HOMEPORT_IMAGE_TAG}'
     ports:
       - '80:80'
-    volumes:
-      - "${CONFIG_FOLDER}/waldur-homeport/config.json:/opnd/config.json"
-      - "${CONFIG_FOLDER}/waldur-homeport/nginx.conf:/etc/nginx/nginx.conf"
+    environment:
+      - API_URL=${API_URL}
     depends_on:
       waldur-db:
         condition: service_healthy
