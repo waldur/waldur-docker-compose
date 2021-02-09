@@ -42,7 +42,7 @@ Test compose configuration:
   before_script:
     - apk update
     - apk add py-pip python3-dev libffi-dev openssl-dev gcc libc-dev make curl
-    - pip install docker-compose
+    - CRYPTOGRAPHY_DONT_BUILD_RUST=1 pip install docker-compose
     - |
       if [ "$TRIGGER_PROJECT_NAME" == "waldur-mastermind" ]; then
         export WALDUR_MASTERMIND_IMAGE_TAG=${TRIGGER_IMAGE_TAG#v}
