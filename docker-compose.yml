@@ -92,8 +92,6 @@ services:
     container_name: waldur-mastermind-api
     image: 'opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
     environment: *default-mastermind-env
-    ports:
-     - "8080:8080"
     volumes: *default-mastermind-volumes
     depends_on:
       waldur-mastermind-worker:
@@ -110,10 +108,8 @@ services:
   waldur-homeport:
     container_name: waldur-homeport
     image: 'opennode/waldur-homeport:${WALDUR_HOMEPORT_IMAGE_TAG}'
-    ports:
-      - '80:80'
     environment:
-      - API_URL=${API_URL}
+      - API_URL=http://${WALDUR_DOMAIN}:${WALDUR_PORT}/
     depends_on:
       waldur-db:
         condition: service_healthy
@@ -124,3 +120,18 @@ services:
       interval: 30s
       timeout: 30s
       retries: 3
+
+  nginx-proxy:
+    container_name: nginx-proxy
+    image: 'nginx:1.18.0-alpine'
+    ports:
+      - '${WALDUR_PORT}:80'
+    environment:
+      - WALDUR_DOMAIN=${WALDUR_DOMAIN}
+      - WALDUR_PORT=${WALDUR_PORT}
+    volumes:
+      - ./proxy-default.conf.template:/etc/nginx/templates/default.conf.template
+      - ./csp_headers.template:/etc/nginx/templates/csp_headers.template
+    depends_on:
+      waldur-homeport:
+        condition: service_healthy
