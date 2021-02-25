@@ -30,7 +30,7 @@ docker exec -t waldur-mastermind-worker status
 docker exec -t waldur-mastermind-worker waldur createstaffuser -u admin -p password -e admin@example.com
 ```
 
-Waldur HomePort will be accessible on http://localhost. API will listen on http://localhost:8080
+Waldur HomePort will be accessible on http://localhost. API will listen on http://localhost/[api, admin, static, docs]
 
 Tearing down and cleaning up:
 ```bash

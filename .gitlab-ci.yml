@@ -38,7 +38,7 @@ Test compose configuration:
     # Using `docker` host due to docker networking model:
     # Accessing directly to the `dind` service
     - curl -i http://docker | grep 200
-    - curl -i http://docker:8080/api/ | grep 401
+    - curl -i http://docker/api/ | grep 401
   before_script:
     - apk update
     - apk add py-pip python3-dev libffi-dev openssl-dev gcc libc-dev make curl

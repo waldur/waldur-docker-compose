@@ -1,0 +1,25 @@
+server {
+    server_name ${WALDUR_DOMAIN};
+    listen 80;
+
+    location / {
+        proxy_pass http://waldur-homeport;
+        include conf.d/csp_headers;
+    }
+
+    location /api {
+        proxy_pass http://waldur-mastermind-api:8080;
+    }
+
+    location /docs {
+        proxy_pass http://waldur-mastermind-api:8080;
+    }
+
+    location /admin {
+        proxy_pass http://waldur-mastermind-api:8080;
+    }
+
+    location /static {
+        proxy_pass http://waldur-mastermind-api:8080;
+    }
+}
