@@ -18,6 +18,6 @@
 # 10. Child and ancestor frames are disabled to provide clickjacking protection.
 # 11. blob and data image is used for previews
 
-add_header Content-Security-Policy "base-uri 'self'; object-src 'none'; media-src 'none'; script-src 'self' 'unsafe-eval' www.google-analytics.com sentry.opnd.org; style-src 'self' 'unsafe-inline'; img-src 'self' www.google-analytics.com *.gravatar.com *.tile.openstreetmap.org ${WALDUR_DOMAIN}:${WALDUR_PORT} blob: data: ; connect-src 'self' ${WALDUR_DOMAIN}:${WALDUR_PORT} sentry.opnd.org:443 sentry.opnd.org:80; font-src 'self' data: ; frame-src 'none'; frame-ancestors 'none'";
+add_header Content-Security-Policy "base-uri 'self'; object-src 'none'; media-src 'none'; script-src 'self' 'unsafe-eval' www.google-analytics.com sentry.opnd.org; style-src 'self' 'unsafe-inline'; img-src 'self' www.google-analytics.com *.gravatar.com *.tile.openstreetmap.org ${WALDUR_DOMAIN} blob: data: ; connect-src 'self' ${WALDUR_DOMAIN} sentry.opnd.org:443 sentry.opnd.org:80; font-src 'self' data: ; frame-src 'none'; frame-ancestors 'none'";
 add_header X-Frame-Options DENY;
 add_header Strict-Transport-Security "max-age=31536000" always;
