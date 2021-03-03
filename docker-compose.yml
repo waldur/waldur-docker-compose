@@ -109,7 +109,7 @@ services:
     container_name: waldur-homeport
     image: 'opennode/waldur-homeport:${WALDUR_HOMEPORT_IMAGE_TAG}'
     environment:
-      - API_URL=${WALDUR_PROTOCOL}://${WALDUR_DOMAIN}:${WALDUR_PORT}/
+      - API_URL=${WALDUR_PROTOCOL}://${WALDUR_DOMAIN}:${WALDUR_PUBLIC_PORT}/
     depends_on:
       waldur-db:
         condition: service_healthy
@@ -125,7 +125,7 @@ services:
     container_name: nginx-proxy
     image: 'nginx:1.18.0-alpine'
     ports:
-      - '${WALDUR_PORT}:80'
+      - '${WALDUR_INTERNAL_PORT}:80'
     environment:
       - WALDUR_DOMAIN=${WALDUR_DOMAIN}
     volumes:
