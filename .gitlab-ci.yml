@@ -5,6 +5,8 @@ include:
     file: "/templates/test/check-merge-compatibility.yml"
   - project: "waldur/waldur-pipelines"
     file: "/templates/release/sync-to-github.yml"
+  - project: "waldur/waldur-pipelines"
+    file: "/templates/release/dev-env-update.yml"
 
 variables:
   GITHUB_OPENNODE_REPO_URL: "git@github.com:opennode/waldur-docker-compose.git"
