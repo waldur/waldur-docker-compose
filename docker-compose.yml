@@ -15,6 +15,12 @@ x-mastermind-environment:
 x-mastermind-volumes:
   &default-mastermind-volumes
   - ${CONFIG_FOLDER}/waldur-mastermind/override.conf.py:/etc/waldur/override.conf.py
+  - ${CONFIG_FOLDER}/waldur-mastermind/saml2.conf.py:/etc/waldur/saml2.conf.py
+  - ${CONFIG_FOLDER}/waldur-mastermind/id_rsa:/etc/waldur/id_rsa
+  - ${CONFIG_FOLDER}/waldur-mastermind/id_rsa.pub:/etc/waldur/id_rsa.pub
+  - ${CONFIG_FOLDER}/waldur-mastermind/saml2:/etc/waldur/saml2
+  - ${CONFIG_FOLDER}/waldur-mastermind/valimo:/etc/waldur/valimo
+  - ${CONFIG_FOLDER}/waldur-mastermind/templates:/etc/waldur/templates
   - ${LOG_FOLDER}:/var/log/waldur
   - ${LIB_FOLDER}:/var/lib/waldur
 
@@ -41,7 +47,7 @@ services:
     container_name: waldur-queue
     image: 'bitnami/redis:latest'
     environment:
-      - REDIS_PASSWORD=waldur-redis-pass
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
 
   # DB migration
   waldur-mastermind-db-migration:
@@ -110,6 +116,10 @@ services:
     image: 'opennode/waldur-homeport:${WALDUR_HOMEPORT_IMAGE_TAG}'
     environment:
       - API_URL=${WALDUR_PROTOCOL}://${WALDUR_DOMAIN}:${WALDUR_PUBLIC_PORT}/
+    volumes:
+      - ${CONFIG_FOLDER}/waldur-homeport/config.template.json:/usr/share/nginx/config.template.json
+      - ${CONFIG_FOLDER}/waldur-homeport/opt/waldur-homeport:/opt/waldur-homeport
+      - ${CONFIG_FOLDER}/waldur-homeport/nginx.conf:/etc/nginx/nginx.conf
     depends_on:
       waldur-db:
         condition: service_healthy
@@ -121,6 +131,7 @@ services:
       timeout: 30s
       retries: 3
 
+  # Proxy
   nginx-proxy:
     container_name: nginx-proxy
     image: 'nginx:1.18.0-alpine'
