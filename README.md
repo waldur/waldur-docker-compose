@@ -1,7 +1,9 @@
 # Waldur Docker-compose deployment
 
 Prerequisites:
-* at least 8GB RAM on Docker Host to run all containers
+
+- at least 8GB RAM on Docker Host to run all containers
+- Docker v1.13+
 
 Prepare environment:
 ```bash
