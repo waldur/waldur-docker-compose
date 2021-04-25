@@ -1,9 +1,4 @@
-Table of Contents
-=================
-
-   * [Docker-compose usage instructions](#docker-compose-usage-instructions)
-
-# Docker-compose usage instructions
+# Waldur Docker-compose deployment
 
 Prerequisites:
 * at least 8GB RAM on Docker Host to run all containers
@@ -11,7 +6,7 @@ Prerequisites:
 Prepare environment:
 ```bash
 # clone repo
-git clone https://github.com/opennode/waldur-docker-compose.git
+git clone https://github.com/waldur/waldur-docker-compose.git
 cd waldur-docker-compose
 # setup settings
 cp .env.example .env
@@ -30,14 +25,15 @@ docker exec -t waldur-mastermind-worker status
 docker exec -t waldur-mastermind-worker waldur createstaffuser -u admin -p password -e admin@example.com
 ```
 
-Waldur HomePort will be accessible on http://localhost. API will listen on http://localhost/[api, admin, static, docs]
+Waldur HomePort will be accessible on [http://localhost](http://localhost).
+API will listen on [http://localhost/api](http://localhost/api).
 
 Tearing down and cleaning up:
 ```bash
 docker-compose down
 ```
 
-Upgrade:
+Upgrading Waldur:
 ```bash
 docker-compose pull
 docker-compose restart
