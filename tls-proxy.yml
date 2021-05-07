@@ -1,0 +1,15 @@
+services:
+  tls-proxy:
+    container_name: tls-proxy
+    image: 'nginxproxy/nginx-proxy:alpine'
+    ports:
+      - '443:443'
+      - '${WALDUR_INTERNAL_PORT}:80'
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - ./certs:/etc/nginx/certs
+
+  # disable port 80 mapping for nginx-proxy to allow redirect to TLS by tls-proxy
+  nginx-proxy:
+    ports:
+      - '80'

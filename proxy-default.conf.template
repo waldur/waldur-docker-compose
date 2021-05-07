@@ -1,5 +1,5 @@
 server {
-    server_name ${WALDUR_DOMAIN};
+    server_name ${VIRTUAL_HOST};
     listen 80;
 
     proxy_set_header        Host            $host;
@@ -33,6 +33,10 @@ server {
     }
 
     location /apidocs {
+        proxy_pass http://waldur-mastermind-api:8080;
+    }
+
+    location /health-check {
         proxy_pass http://waldur-mastermind-api:8080;
     }
 }
