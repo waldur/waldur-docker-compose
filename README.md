@@ -1,11 +1,12 @@
 # Waldur Docker-compose deployment
 
-Prerequisites:
+## Prerequisites
 
 - at least 8GB RAM on Docker Host to run all containers
 - Docker v1.13+
 
-Prepare environment:
+## Prepare environment
+
 ```bash
 # clone repo
 git clone https://github.com/waldur/waldur-docker-compose.git
@@ -14,7 +15,8 @@ cd waldur-docker-compose
 cp .env.example .env
 ```
 
-Booting up:
+## Booting up
+
 ```bash
 # start containers
 docker-compose up -d
@@ -30,13 +32,26 @@ docker exec -t waldur-mastermind-worker waldur createstaffuser -u admin -p passw
 Waldur HomePort will be accessible on [http://localhost](http://localhost).
 API will listen on [http://localhost/api](http://localhost/api).
 
+Healthcheck can be accessed on [http://localhost/health-check](http://localhost/health-check).
+
 Tearing down and cleaning up:
 ```bash
 docker-compose down
 ```
 
-Upgrading Waldur:
+## Upgrading Waldur
+
 ```bash
 docker-compose pull
 docker-compose restart
+```
+
+## Using TLS
+
+1. Add private key and certificate to ``./certs`` folder.
+2. Start docker-compose with an extra TLS proxy:
+
+```bash
+# start containers
+docker-compose up -f docker-compose.yml -f tls-proxy.yml -d
 ```
