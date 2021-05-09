@@ -49,8 +49,9 @@ docker-compose restart
 ## Using TLS
 
 1. Add private key and certificate to ``./certs`` folder.
-2. Start docker-compose with an extra TLS proxy:
-
+2. Edit docker-compose.yml and replace port section with '80'. This is needed to force HTTP->HTTPS redirect from a TLS proxy:
+``sed -i 's/${WALDUR_INTERNAL_PORT}:80/80/' docker-compose.yml``.
+3. Start docker-compose with an extra TLS proxy:
 ```bash
 # start containers
 docker-compose up -f docker-compose.yml -f tls-proxy.yml -d
