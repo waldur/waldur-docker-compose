@@ -18,7 +18,8 @@ x-mastermind-volumes:
   - ${CONFIG_FOLDER}/waldur-mastermind/saml2.conf.py:/etc/waldur/saml2.conf.py
   - ${CONFIG_FOLDER}/waldur-mastermind/id_rsa:/etc/waldur/id_rsa
   - ${CONFIG_FOLDER}/waldur-mastermind/id_rsa.pub:/etc/waldur/id_rsa.pub
-  - ${CONFIG_FOLDER}/waldur-mastermind/saml2:/etc/waldur/saml2
+  - ${CONFIG_FOLDER}/waldur-mastermind/saml2/credentials:/etc/waldur/saml2/credentials
+  - ${CONFIG_FOLDER}/waldur-mastermind/saml2/metadata:/etc/waldur/saml2/metadata
   - ${CONFIG_FOLDER}/waldur-mastermind/valimo:/etc/waldur/valimo
   - ${CONFIG_FOLDER}/waldur-mastermind/templates:/etc/waldur/templates
   - ${LOG_FOLDER}:/var/log/waldur
