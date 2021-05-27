@@ -11,6 +11,7 @@ x-mastermind-environment:
   - EVENTS_LOG_FILE=/var/log/waldur/events.log
   - GLOBAL_DEFAULT_FROM_EMAIL=${GLOBAL_DEFAULT_FROM_EMAIL}
   - SENTRY_DSN=${SENTRY_DSN}
+  - GLOBAL_DEBUG=false
 
 x-mastermind-volumes:
   &default-mastermind-volumes
