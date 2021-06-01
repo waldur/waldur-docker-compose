@@ -43,6 +43,7 @@ services:
       interval: 30s
       timeout: 30s
       retries: 3
+    restart: always
 
   # Redis
   waldur-queue:
@@ -50,6 +51,7 @@ services:
     image: 'bitnami/redis:latest'
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
+    restart: always
 
   # DB migration
   waldur-mastermind-db-migration:
@@ -81,6 +83,7 @@ services:
       timeout: 30s
       retries: 3
     command: worker
+    restart: always
 
   # Celery-beat
   waldur-mastermind-beat:
@@ -94,6 +97,7 @@ services:
       waldur-mastermind-worker:
         condition: service_started
     command: beat
+    restart: always
 
   # MasterMind API
   waldur-mastermind-api:
@@ -111,6 +115,7 @@ services:
       waldur-queue:
         condition: service_started
     command: mastermind
+    restart: always
 
   # HomePort
   waldur-homeport:
@@ -132,6 +137,7 @@ services:
       interval: 30s
       timeout: 30s
       retries: 3
+    restart: always
 
   # Proxy
   nginx-proxy:
@@ -147,3 +153,4 @@ services:
     depends_on:
       waldur-homeport:
         condition: service_healthy
+    restart: always
