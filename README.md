@@ -54,5 +54,5 @@ docker-compose restart
 3. Start docker-compose with an extra TLS proxy:
 ```bash
 # start containers
-docker-compose up -f docker-compose.yml -f tls-proxy.yml -d
+docker-compose -f docker-compose.yml -f tls-proxy.yml up -d
 ```
