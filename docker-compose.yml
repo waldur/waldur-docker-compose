@@ -1,4 +1,4 @@
-version: '2.2'
+version: '3.3'
 
 services:
   # PostgreSQL
@@ -33,6 +33,10 @@ services:
       - "./config/waldur-mastermind:/etc/waldur:ro"
       - "./waldur_libs:/var/lib/waldur"
       - "./waldur_logs:/var/log/waldur"
+    environment:
+      - GLOBAL_SECRET_KEY=default
+      - POSTGRESQL_HOST=waldur-db
+      - POSTGRESQL_PASSWORD=default
     depends_on:
       waldur-db:
         condition: service_healthy
@@ -48,11 +52,19 @@ services:
       - "./config/waldur-mastermind:/etc/waldur:ro"
       - "./waldur_libs:/var/lib/waldur"
       - "./waldur_logs:/var/log/waldur"
+    environment:
+      - GLOBAL_SECRET_KEY=default
+      - POSTGRESQL_HOST=waldur-db
+      - POSTGRESQL_PASSWORD=default
+      - REDIS_HOST=waldur-queue
+      - REDIS_PASSWORD=waldur-redis-pass
     depends_on:
       waldur-db:
         condition: service_healthy
       waldur-queue:
         condition: service_started
+      waldur-mastermind-db-migration:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "celery -A waldur_core.server inspect ping"]
       interval: 30s
@@ -68,11 +80,21 @@ services:
       - "./config/waldur-mastermind:/etc/waldur:ro"
       - "./waldur_libs:/var/lib/waldur"
       - "./waldur_logs:/var/log/waldur"
+    environment:
+      - GLOBAL_SECRET_KEY=default
+      - POSTGRESQL_HOST=waldur-db
+      - POSTGRESQL_PASSWORD=default
+      - REDIS_HOST=waldur-queue
+      - REDIS_PASSWORD=waldur-redis-pass
     depends_on:
       waldur-db:
         condition: service_healthy
+      waldur-queue:
+        condition: service_started
       waldur-mastermind-worker:
         condition: service_started
+      waldur-mastermind-db-migration:
+        condition: service_completed_successfully
     command: beat
 
   # MasterMind uwsgi
@@ -85,6 +107,12 @@ services:
       - "./config/waldur-mastermind:/etc/waldur:ro"
       - "./waldur_libs:/var/lib/waldur"
       - "./waldur_logs:/var/log/waldur"
+    environment:
+      - GLOBAL_SECRET_KEY=default
+      - POSTGRESQL_HOST=waldur-db
+      - POSTGRESQL_PASSWORD=default
+      - REDIS_HOST=waldur-queue
+      - REDIS_PASSWORD=waldur-redis-pass
     depends_on:
       waldur-mastermind-worker:
         condition: service_started
@@ -94,6 +122,8 @@ services:
         condition: service_healthy
       waldur-queue:
         condition: service_started
+      waldur-mastermind-db-migration:
+        condition: service_completed_successfully
     command: mastermind
 
   # HomePort
@@ -110,6 +140,8 @@ services:
         condition: service_healthy
       waldur-mastermind-uwsgi:
         condition: service_started
+      waldur-mastermind-db-migration:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "curl --silent --fail http://waldur-homeport/ || exit 1"]
       interval: 30s
