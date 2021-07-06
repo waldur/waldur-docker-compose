@@ -27,6 +27,9 @@ docker exec -t waldur-mastermind-worker status
 
 # Create user
 docker exec -t waldur-mastermind-worker waldur createstaffuser -u admin -p password -e admin@example.com
+
+# Create demo categories for OpenStack: Virtual Private Cloud, VMs and Storage 
+docker exec -t waldur-mastermind-worker waldur load_categories vpc vm storage
 ```
 
 Waldur HomePort will be accessible on [http://localhost](http://localhost).
@@ -35,6 +38,7 @@ API will listen on [http://localhost/api](http://localhost/api).
 Healthcheck can be accessed on [http://localhost/health-check](http://localhost/health-check).
 
 Tearing down and cleaning up:
+
 ```bash
 docker-compose down
 ```
@@ -51,8 +55,9 @@ docker-compose restart
 1. Add private key and certificate to ``./certs`` folder.
 2. Edit docker-compose.yml and replace port section with '80'. This is needed to force HTTP->HTTPS redirect from a TLS proxy:
 ``sed -i 's/${WALDUR_INTERNAL_PORT}:80/80/' docker-compose.yml``.
-3. Change `WALDUR_PUBLIC_PORT` in .env to 443 and `WALDUR_PROTOCOL` to https.    
+3. Change `WALDUR_PUBLIC_PORT` in .env to 443 and `WALDUR_PROTOCOL` to `https`.
 4. Start docker-compose with an extra TLS proxy:
+
 ```bash
 # start containers
 docker-compose -f docker-compose.yml -f tls-proxy.yml up -d
