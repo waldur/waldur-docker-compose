@@ -43,6 +43,13 @@ Tearing down and cleaning up:
 docker-compose down
 ```
 
+## Known issues
+
+When Waldur is launched for the first time, it applies initial database migrations.
+It means that you may need to wait few minutes until these migrations are applied.
+Otherwise you may observe HTTP error 500 rendered by REST API server.
+This issue would be resolved after upgrade to [Docker Compose 1.29](https://docs.docker.com/compose/release-notes/#1290).
+
 ## Upgrading Waldur
 
 ```bash
