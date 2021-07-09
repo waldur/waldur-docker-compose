@@ -30,7 +30,7 @@ services:
   # PostgreSQL
   waldur-db:
     container_name: waldur-db
-    image: 'postgres:12'
+    image: '${DOCKER_REGISTRY_PREFIX}library/postgres:12'
     user: root
     environment:
       - POSTGRES_USER=waldur
@@ -48,7 +48,7 @@ services:
   # Redis
   waldur-queue:
     container_name: waldur-queue
-    image: 'bitnami/redis:latest'
+    image: '${DOCKER_REGISTRY_PREFIX}bitnami/redis:latest'
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
     restart: always
@@ -56,7 +56,7 @@ services:
   # DB migration
   waldur-mastermind-db-migration:
     container_name: waldur-mastermind-db-migration
-    image: 'opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
     environment: *default-mastermind-env
     volumes: *default-mastermind-volumes
     depends_on:
@@ -69,7 +69,7 @@ services:
   # Celery
   waldur-mastermind-worker:
     container_name: waldur-mastermind-worker
-    image: 'opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
     environment: *default-mastermind-env
     volumes: *default-mastermind-volumes
     depends_on:
@@ -88,7 +88,7 @@ services:
   # Celery-beat
   waldur-mastermind-beat:
     container_name: waldur-mastermind-beat
-    image: 'opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
     environment: *default-mastermind-env
     volumes: *default-mastermind-volumes
     depends_on:
@@ -102,7 +102,7 @@ services:
   # MasterMind API
   waldur-mastermind-api:
     container_name: waldur-mastermind-api
-    image: 'opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
     environment: *default-mastermind-env
     volumes: *default-mastermind-volumes
     depends_on:
@@ -120,7 +120,7 @@ services:
   # HomePort
   waldur-homeport:
     container_name: waldur-homeport
-    image: 'opennode/waldur-homeport:${WALDUR_HOMEPORT_IMAGE_TAG}'
+    image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-homeport:${WALDUR_HOMEPORT_IMAGE_TAG}'
     environment:
       - API_URL=${WALDUR_PROTOCOL}://${WALDUR_DOMAIN}:${WALDUR_PUBLIC_PORT}/
     volumes:
@@ -142,7 +142,7 @@ services:
   # Proxy
   nginx-proxy:
     container_name: nginx-proxy
-    image: 'nginx:1.18.0-alpine'
+    image: '${DOCKER_REGISTRY_PREFIX}library/nginx:1.18.0-alpine'
     ports:
       - '${WALDUR_INTERNAL_PORT}:80'
     environment:
