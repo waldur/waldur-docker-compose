@@ -11,6 +11,7 @@ include:
 variables:
   GITHUB_OPENNODE_REPO_URL: "git@github.com:opennode/waldur-docker-compose.git"
   GITHUB_WALDUR_REPO_URL: "git@github.com:waldur/waldur-docker-compose.git"
+  DOCKER_REGISTRY_PREFIX: "registry.hpc.ut.ee/mirror/"
 
 Test compose configuration:
   services:
@@ -32,6 +33,9 @@ Test compose configuration:
     COMPOSE_INTERACTIVE_NO_CLI: 1
   script:
     - cp -vf .env.example .env
+    - docker-compose -v
+    - docker context list
+    - docker info
     - docker-compose up waldur-mastermind-db-migration
     - docker-compose up -d
     - docker-compose ps
@@ -53,7 +57,7 @@ Test compose configuration:
       fi
 
 Upload configuration guide:
-  image: python:3.8-buster
+  image: "registry.hpc.ut.ee/mirror/library/python:3.8-buster"
   stage: deploy
   interruptible: true
   rules:
