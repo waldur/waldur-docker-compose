@@ -7,8 +7,6 @@ x-mastermind-environment:
   - POSTGRESQL_PASSWORD=${POSTGRESQL_PASSWORD}
   - REDIS_HOST=waldur-queue
   - REDIS_PASSWORD=${REDIS_PASSWORD}
-  - LOGGING_LOG_FILE=/var/log/waldur/core.log
-  - EVENTS_LOG_FILE=/var/log/waldur/events.log
   - GLOBAL_DEFAULT_FROM_EMAIL=${GLOBAL_DEFAULT_FROM_EMAIL}
   - SENTRY_DSN=${SENTRY_DSN}
   - GLOBAL_DEBUG=${GLOBAL_DEBUG}
@@ -16,6 +14,10 @@ x-mastermind-environment:
 x-mastermind-volumes:
   &default-mastermind-volumes
   - ${CONFIG_FOLDER}/waldur-mastermind/override.conf.py:/etc/waldur/override.conf.py
+  - ${CONFIG_FOLDER}/waldur-mastermind/logging.conf.py:/etc/waldur/logging.conf.py
+  - ${CONFIG_FOLDER}/waldur-mastermind/beat:/usr/local/bin/beat
+  - ${CONFIG_FOLDER}/waldur-mastermind/worker:/usr/local/bin/worker
+  - ${CONFIG_FOLDER}/waldur-mastermind/uwsgi.ini:/etc/waldur/uwsgi.ini
   - ${CONFIG_FOLDER}/waldur-mastermind/saml2.conf.py:/etc/waldur/saml2.conf.py
   - ${CONFIG_FOLDER}/waldur-mastermind/id_rsa:/etc/waldur/id_rsa
   - ${CONFIG_FOLDER}/waldur-mastermind/id_rsa.pub:/etc/waldur/id_rsa.pub
@@ -23,7 +25,6 @@ x-mastermind-volumes:
   - ${CONFIG_FOLDER}/waldur-mastermind/saml2/metadata:/etc/waldur/saml2/metadata
   - ${CONFIG_FOLDER}/waldur-mastermind/valimo:/etc/waldur/valimo
   - ${CONFIG_FOLDER}/waldur-mastermind/templates:/etc/waldur/templates
-  - ${LOG_FOLDER}:/var/log/waldur
   - ${LIB_FOLDER}:/var/lib/waldur
 
 services:
@@ -154,3 +155,26 @@ services:
       waldur-homeport:
         condition: service_healthy
     restart: always
+
+  logger:
+    image: umputun/docker-logger
+    container_name: "logger"
+    hostname: "logger"
+    restart: always
+    logging:
+      driver: json-file
+      options:
+          max-size: "10m"
+          max-file: "5"
+    environment:
+        - LOG_FILES=true
+        - LOG_SYSLOG=false
+        - MAX_FILES=10
+        - MAX_SIZE=50
+        - MAX_AGE=365
+        - MIX_ERR=true
+        - DEBUG=false
+        - INCLUDE=waldur-db,waldur-queue,waldur-mastermind-db-migration,waldur-mastermind-worker,waldur-mastermind-beat,waldur-mastermind-api,waldur-homeport,tls-proxy,nginx-proxy
+    volumes:
+        - ${LOG_FOLDER}:/srv/logs
+        - /var/run/docker.sock:/var/run/docker.sock

@@ -28,7 +28,7 @@ docker exec -t waldur-mastermind-worker status
 # Create user
 docker exec -t waldur-mastermind-worker waldur createstaffuser -u admin -p password -e admin@example.com
 
-# Create demo categories for OpenStack: Virtual Private Cloud, VMs and Storage 
+# Create demo categories for OpenStack: Virtual Private Cloud, VMs and Storage
 docker exec -t waldur-mastermind-worker waldur load_categories vpc vm storage
 ```
 
@@ -42,6 +42,11 @@ Tearing down and cleaning up:
 ```bash
 docker-compose down
 ```
+
+## Logs
+
+Logs emitted by the containers are collected and saved in the `waldur_logs` folder. You can change the location by
+editing environment variable (`.env`) and updating `LOG_FOLDER` value.
 
 ## Known issues
 
@@ -60,9 +65,8 @@ docker-compose restart
 ## Using TLS
 
 1. Add private key and certificate to ``./certs`` folder.
-2. Edit docker-compose.yml and replace port section with '80'. This is needed to force HTTP->HTTPS redirect from a TLS proxy:
-``sed -i 's/${WALDUR_INTERNAL_PORT}:80/80/' docker-compose.yml``.
-3. Change `WALDUR_PUBLIC_PORT` in .env to 443 and `WALDUR_PROTOCOL` to `https`.
+2. Edit docker-compose.yml and replace port section with '80'. This is needed to force HTTP->HTTPS redirect from a TLS proxy: `sed -i 's/${WALDUR_INTERNAL_PORT}:80/80/' docker-compose.yml`.
+3. Change `WALDUR_PUBLIC_PORT` in .env to 443 and `WALDUR_PROTOCOL` to https.
 4. Start docker-compose with an extra TLS proxy:
 
 ```bash
