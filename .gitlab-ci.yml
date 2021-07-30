@@ -89,7 +89,9 @@ Upload configuration guide:
     - git config --global user.name "$GITLAB_USER_NAME"
     - git config --global user.email "$GITLAB_USER_EMAIL"
     - cp -vf ${CI_BUILDS_DIR}/${CI_PROJECT_PATH}/README.md $GUIDE_PATH
+    - mkdir -p $API_DOCS_PATH
     - cp -vf ${CI_BUILDS_DIR}/${CI_PROJECT_PATH}/docs/* $API_DOCS_PATH
+    - git add $API_DOCS_PATH
     - git commit $GUIDE_PATH $API_DOCS_PATH -m "Update configuration guide and API docs" || exit 0
     - git branch new-configuration-guide
     - git push --set-upstream origin new-configuration-guide:master
