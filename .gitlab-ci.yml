@@ -45,6 +45,17 @@ Test compose configuration:
     # Accessing directly to the `dind` service
     - curl -i http://docker | grep 200
     - curl -i http://docker/api/ | grep 401
+    - mkdir docs/
+    - API_GROUPS_STRING=$(docker exec waldur-mastermind-api waldur shell -c "from waldur_core.core.api_groups_mapping import API_GROUPS; print(' '.join(API_GROUPS.keys()))")
+    - echo $API_GROUPS_STRING
+    - |
+      for item in $API_GROUPS_STRING
+      do
+        echo "$item"
+        curl -s "http://docker/docs/$item/?format=openapi" -o docs/$item-docs.json
+        item_cap=`echo ${item:0:1} | tr '[a-z]' '[A-Z]'`${item:1}
+        echo -e "# $item_cap\n\n"'!!'"swagger $item-docs.json"'!!' > docs/$item-api.md
+      done
   before_script:
     - apk update
     - apk add py-pip python3-dev libffi-dev openssl-dev gcc libc-dev make curl
@@ -55,6 +66,11 @@ Test compose configuration:
       elif [ "$TRIGGER_PROJECT_NAME" == "waldur-homeport" ]; then
         export WALDUR_HOMEPORT_IMAGE_TAG=${TRIGGER_IMAGE_TAG#v}
       fi
+  artifacts:
+    # Saving generated doc files for further configuration uploading
+    paths:
+      - docs/
+    expire_in: 1 day
 
 Upload configuration guide:
   image: "registry.hpc.ut.ee/mirror/library/python:3.8-buster"
@@ -65,6 +81,7 @@ Upload configuration guide:
     - if: '$CI_COMMIT_BRANCH == "develop"'
   variables:
     GUIDE_PATH: docs/admin-guide/deployment/docker-compose.md
+    API_DOCS_PATH: docs/api/
   script:
     - cd /tmp/
     - git clone "https://gitlab-ci-token:$GITLAB_TOKEN@$CI_SERVER_HOST/waldur/waldur-docs.git"
@@ -72,6 +89,7 @@ Upload configuration guide:
     - git config --global user.name "$GITLAB_USER_NAME"
     - git config --global user.email "$GITLAB_USER_EMAIL"
     - cp -vf ${CI_BUILDS_DIR}/${CI_PROJECT_PATH}/README.md $GUIDE_PATH
-    - git commit $GUIDE_PATH -m "Update configuration guide" || exit 0
+    - cp -vf ${CI_BUILDS_DIR}/${CI_PROJECT_PATH}/docs/* $API_DOCS_PATH
+    - git commit $GUIDE_PATH $API_DOCS_PATH -m "Update configuration guide and API docs" || exit 0
     - git branch new-configuration-guide
     - git push --set-upstream origin new-configuration-guide:master
