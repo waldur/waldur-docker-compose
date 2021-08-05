@@ -48,6 +48,8 @@ Test compose configuration:
     - mkdir docs/
     - API_GROUPS_STRING=$(docker exec waldur-mastermind-api waldur shell -c "from waldur_core.core.api_groups_mapping import API_GROUPS; print(' '.join(API_GROUPS.keys()))")
     - echo $API_GROUPS_STRING
+    - echo -e "# API index\n" > docs/index.md
+    - echo -e "Summary:\n" >> docs/index.md
     - |
       for item in $API_GROUPS_STRING
       do
@@ -55,6 +57,7 @@ Test compose configuration:
         curl -s "http://docker/docs/$item/?format=openapi" -o docs/$item-docs.json
         item_cap=`echo ${item:0:1} | tr '[a-z]' '[A-Z]'`${item:1}
         echo -e "# $item_cap\n\n"'!!'"swagger $item-docs.json"'!!' > docs/$item-api.md
+        echo "- [$item_cap]($item-api.md)" >> docs/index.md
       done
   before_script:
     - apk update
@@ -81,7 +84,7 @@ Upload configuration guide:
     - if: '$CI_COMMIT_BRANCH == "develop"'
   variables:
     GUIDE_PATH: docs/admin-guide/deployment/docker-compose.md
-    API_DOCS_PATH: docs/api/
+    API_DOCS_PATH: docs/API/
   script:
     - cd /tmp/
     - git clone "https://gitlab-ci-token:$GITLAB_TOKEN@$CI_SERVER_HOST/waldur/waldur-docs.git"
