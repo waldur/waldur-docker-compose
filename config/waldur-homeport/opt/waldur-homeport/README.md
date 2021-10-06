@@ -1,4 +1,5 @@
-# Expected file list:
+# Expected file list
+
 - login-logo.png
 - sidebar-logo.png
 - privacy.html
@@ -7,7 +8,8 @@
 - favicon.ico
 
 Don't forgret to adjust `config/waldur-homeport/nginx.conf`, e.g.:
-```
+
+```nginx
     location /login-logo.png {
         alias /opt/waldur-homeport/login-logo.png;
         expires 4h;
