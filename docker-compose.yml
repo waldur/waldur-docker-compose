@@ -124,6 +124,7 @@ services:
     image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-homeport:${WALDUR_HOMEPORT_IMAGE_TAG}'
     environment:
       - API_URL=${WALDUR_PROTOCOL}://${WALDUR_DOMAIN}:${WALDUR_PUBLIC_PORT}/
+      - TITLE=${WALDUR_TITLE}
     volumes:
       - ${CONFIG_FOLDER}/waldur-homeport/config.template.json:/usr/share/nginx/config.template.json
       - ${CONFIG_FOLDER}/waldur-homeport/opt/waldur-homeport:/opt/waldur-homeport
