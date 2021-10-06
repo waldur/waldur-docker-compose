@@ -1,3 +1,4 @@
-# Expected file list:
+# Expected file list
+
 - credentials/sp.crt
 - credentials/sp.pem
