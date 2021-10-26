@@ -64,12 +64,28 @@ docker-compose restart
 
 ## Using TLS
 
-1. Add private key and certificate to ``./certs`` folder.
-1. Edit docker-compose.yml and replace port section with '80'. This is needed to force HTTP->HTTPS redirect from a TLS proxy: `sed -i 's/${WALDUR_INTERNAL_PORT}:80/80/' docker-compose.yml`.
-1. Change `WALDUR_PUBLIC_PORT` in .env to 443 and `WALDUR_PROTOCOL` to https.
-1. Start docker-compose with an extra TLS proxy:
+This setup supports following types of SSL certificates:
+
+- Email - set environment variable TLS to your email to register Let's Encrypt account and get free automatic SSL certificates.
+
+Example:
 
 ```bash
-# start containers
-docker-compose -f docker-compose.yml -f tls-proxy.yml up -d
+TLS=my@email.com
+```
+
+- Internal - set environment variable TLS to "internal" to generate self-signed certificates for dev environments
+
+Example:
+
+```bash
+TLS=internal
+```
+
+- Custom - set environment variable TLS to "cert.pem key.pem" where cert.pem and key.pem - are paths to your custom certificates (this needs modifying docker-compose with path to your certificates passed as volumes)
+
+Example:
+
+```bash
+TLS=cert.pem key.pem
 ```

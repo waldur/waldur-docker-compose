@@ -33,11 +33,14 @@ Test compose configuration:
   variables:
     DOCKER_DRIVER: overlay2
     COMPOSE_INTERACTIVE_NO_CLI: 1
+    WALDUR_DOMAIN: docker
+    TLS: internal
   script:
     - cp -vf .env.example .env
     - docker-compose -v
     - docker context list
     - docker info
+    - docker-compose config
     - docker-compose up waldur-mastermind-db-migration
     - docker-compose up -d
     - docker-compose ps
@@ -45,8 +48,8 @@ Test compose configuration:
     - docker-compose exec waldur-mastermind-worker waldur createstaffuser -u admin -p password -e admin@example.com
     # Using `docker` host due to docker networking model:
     # Accessing directly to the `dind` service
-    - curl -i http://docker | grep 200
-    - curl -i http://docker/api/ | grep 401
+    - curl -k -i https://docker | grep 200
+    - curl -k -i https://docker/api/ | grep 401
     - mkdir docs/
     - API_GROUPS_STRING=$(docker exec waldur-mastermind-api waldur shell -c "from waldur_core.core.api_groups_mapping import API_GROUPS; print(' '.join(API_GROUPS.keys()))")
     - echo $API_GROUPS_STRING

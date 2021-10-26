@@ -1,0 +1,19 @@
+{$VIRTUAL_HOST} {
+    tls {$TLS}
+
+    reverse_proxy /* http://waldur-homeport {
+      header_down X-Frame-Options DENY
+      header_down Content-Security-Policy "base-uri 'self'; object-src 'none'; media-src 'none'; script-src 'self' 'unsafe-eval' www.google-analytics.com sentry.opnd.org; style-src 'self' 'unsafe-inline'; img-src 'self' www.google-analytics.com *.gravatar.com *.tile.openstreetmap.org ${VIRTUAL_HOST} blob: data: ; connect-src 'self' ${VIRTUAL_HOST} nominatim.openstreetmap.org:443 sentry.opnd.org:443 sentry.opnd.org:80; font-src 'self' data: ; frame-src 'none'; frame-ancestors 'none'"
+      header_down Strict-Transport-Security max-age=31536000 always
+      header_down -Server
+   }
+
+    reverse_proxy /api/* http://waldur-mastermind-api:8080
+    reverse_proxy /api-auth/* http://waldur-mastermind-api:8080
+    reverse_proxy /docs/* http://waldur-mastermind-api:8080
+    reverse_proxy /admin/* http://waldur-mastermind-api:8080
+    reverse_proxy /static/* http://waldur-mastermind-api:8080
+    reverse_proxy /media/* http://waldur-mastermind-api:8080
+    reverse_proxy /apidocs/* http://waldur-mastermind-api:8080
+    reverse_proxy /health-check/* http://waldur-mastermind-api:8080
+}
