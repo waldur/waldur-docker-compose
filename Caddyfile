@@ -1,3 +1,7 @@
+{
+    default_sni {$VIRTUAL_HOST}
+}
+
 {$VIRTUAL_HOST} {
     tls {$TLS}
 
