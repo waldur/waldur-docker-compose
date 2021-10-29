@@ -11,7 +11,6 @@ include:
     file: "/templates/deploy/dev-env-update.yml"
 
 variables:
-  GITHUB_OPENNODE_REPO_URL: "git@github.com:opennode/waldur-docker-compose.git"
   GITHUB_WALDUR_REPO_URL: "git@github.com:waldur/waldur-docker-compose.git"
   DOCKER_REGISTRY_PREFIX: "registry.hpc.ut.ee/mirror/"
 
