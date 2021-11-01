@@ -89,3 +89,7 @@ Example:
 ```bash
 TLS=cert.pem key.pem
 ```
+
+## Custom Caddy configuration files
+
+To add additional caddy config snippets into the caddy virtual host configuration add .conf files to config/caddy-includes/
