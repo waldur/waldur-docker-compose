@@ -154,6 +154,7 @@ services:
       - TLS=${TLS:-"certs@waldur.com"}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./config/caddy-includes/:/etc/caddy-includes
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
