@@ -58,7 +58,7 @@ Test compose configuration:
       for item in $API_GROUPS_STRING
       do
         echo "$item"
-        curl -s "http://docker/docs/$item/?format=openapi" -o docs/$item-docs.json
+        curl -sLk "http://docker/docs/$item/?format=openapi" -o docs/$item-docs.json
         item_cap=`echo ${item:0:1} | tr '[a-z]' '[A-Z]'`${item:1}
         echo -e "# $item_cap\n\n"'!!'"swagger $item-docs.json"'!!' > docs/$item-api.md
         echo "- [$item_cap]($item-api.md)" >> docs/index.md
