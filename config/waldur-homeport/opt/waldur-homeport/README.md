@@ -7,17 +7,15 @@
 - tos.html
 - favicon.ico
 
-Don't forgret to adjust `config/waldur-homeport/nginx.conf`, e.g.:
+Don't forget to adjust `config/waldur-homeport/nginx.conf`, e.g.:
 
 ```nginx
     location /login-logo.png {
         alias /opt/waldur-homeport/login-logo.png;
-        expires 4h;
     }
 
     location /sidebar-logo.png {
         alias /opt/waldur-homeport/sidebar-logo.png;
-        expires 4h;
     }
 
     location /views/policy/privacy.html {
