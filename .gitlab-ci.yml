@@ -6,12 +6,9 @@ include:
   - project: "waldur/waldur-pipelines"
     file: "/templates/test/lint-md-files.yml"
   - project: "waldur/waldur-pipelines"
-    file: "/templates/release/sync-to-github.yml"
-  - project: "waldur/waldur-pipelines"
     file: "/templates/deploy/dev-env-update.yml"
 
 variables:
-  GITHUB_WALDUR_REPO_URL: "git@github.com:waldur/waldur-docker-compose.git"
   DOCKER_REGISTRY_PREFIX: "registry.hpc.ut.ee/mirror/"
 
 Test compose configuration:
