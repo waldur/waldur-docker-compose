@@ -20,6 +20,7 @@
     reverse_proxy /media/* http://waldur-mastermind-api:8080
     reverse_proxy /apidocs/* http://waldur-mastermind-api:8080
     reverse_proxy /health-check/* http://waldur-mastermind-api:8080
+    reverse_proxy /auth/* http://keycloak:8080
 
     import /etc/caddy-includes/*.conf
 }

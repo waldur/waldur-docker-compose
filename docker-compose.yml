@@ -10,6 +10,7 @@ x-mastermind-environment:
   - GLOBAL_DEFAULT_FROM_EMAIL=${GLOBAL_DEFAULT_FROM_EMAIL}
   - SENTRY_DSN=${SENTRY_DSN}
   - GLOBAL_DEBUG=${GLOBAL_DEBUG}
+  - KEYCLOAK_SECRET=${KEYCLOAK_SECRET}
 
 x-mastermind-volumes:
   &default-mastermind-volumes
@@ -162,6 +163,19 @@ services:
         condition: service_healthy
     restart: always
 
+
+  keycloak:
+    container_name: keycloak
+    image: 'quay.io/keycloak/keycloak:15.0.2'
+    restart: always
+    environment:
+      - KEYCLOAK_FRONTEND_URL=https://${WALDUR_DOMAIN}/auth
+      - PROXY_ADDRESS_FORWARDING=true
+      - KEYCLOAK_IMPORT=/tmp/realm.json
+    volumes:
+      - keycloak_data:/opt/jboss/keycloak/standalone/data
+      - ./config/keycloak/realm.json:/tmp/realm.json
+
   logger:
     image: umputun/docker-logger
     container_name: "logger"
@@ -180,7 +194,7 @@ services:
         - MAX_AGE=365
         - MIX_ERR=true
         - DEBUG=false
-        - INCLUDE=waldur-db,waldur-queue,waldur-mastermind-db-migration,waldur-mastermind-worker,waldur-mastermind-beat,waldur-mastermind-api,waldur-homeport,caddy
+        - INCLUDE=waldur-db,waldur-queue,waldur-mastermind-db-migration,waldur-mastermind-worker,waldur-mastermind-beat,waldur-mastermind-api,waldur-homeport,caddy,keycloak
     volumes:
         - ${LOG_FOLDER}:/srv/logs
         - /var/run/docker.sock:/var/run/docker.sock
@@ -188,3 +202,4 @@ services:
 volumes:
   caddy_data:
   caddy_config:
+  keycloak_data:
