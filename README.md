@@ -93,3 +93,16 @@ TLS=cert.pem key.pem
 ## Custom Caddy configuration files
 
 To add additional caddy config snippets into the caddy virtual host configuration add .conf files to config/caddy-includes/
+
+## Keycloak
+
+Keycloak is an Identity and Access Management software bundled with waldur-docker-compose.
+
+To create a keycloak admin account run:
+
+```bash
+docker exec keycloak /opt/jboss/keycloak/bin/add-user-keycloak.sh -u <USERNAME> -p <PASSWORD>
+docker restart keycloak
+```
+
+Login to the admin interface at [https://localhost/auth/admin](https://localhost/auth/admin) and create Waldur users
