@@ -28,6 +28,7 @@ x-mastermind-volumes:
   - ${CONFIG_FOLDER}/waldur-mastermind/templates:/etc/waldur/templates
   - ${LIB_FOLDER}:/var/lib/waldur
   - /var/run/docker.sock:/var/run/docker.sock
+  - /dev/shm/waldur-script-launchzone:/dev/shm/waldur-script-launchzone
 
 services:
   # PostgreSQL
