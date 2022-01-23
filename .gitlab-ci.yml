@@ -46,6 +46,7 @@ Test compose configuration:
     # Accessing directly to the `dind` service
     - curl -k -i https://docker | grep 200
     - curl -k -i https://docker/api/ | grep 401
+    - curl -X POST -d '{"username":"admin","password":"password" }' -H "Content-type:application/json" -k -i https://docker/api-auth/password/ | grep 200
     - mkdir docs/
     - API_GROUPS_STRING=$(docker exec waldur-mastermind-api waldur shell -c "from waldur_core.core.api_groups_mapping import API_GROUPS; print(' '.join(API_GROUPS.keys()))")
     - echo $API_GROUPS_STRING
