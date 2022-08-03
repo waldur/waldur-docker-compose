@@ -738,7 +738,7 @@
       "clientAuthenticatorType": "client-secret",
       "secret": "76bc7e31-3c1b-4406-bd82-5c7f1fefd00a",
       "redirectUris": [
-        "/*"
+        "*"
       ],
       "webOrigins": [],
       "notBefore": 0,
