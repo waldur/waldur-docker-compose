@@ -1,0 +1,6 @@
+WALDUR_SYNC_DIRECTION=pull
+WALDUR_API_URL=http://waldur-mastermind-api/api/
+WALDUR_API_TOKEN=<service-provider-token>
+WALDUR_OFFERING_UUID=<slurm-offering-uuid>
+SLURM_DEFAULT_ACCOUNT=root
+SLURM_CONTAINER_NAME=cluster

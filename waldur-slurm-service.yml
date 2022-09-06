@@ -1,0 +1,19 @@
+services:
+  slurm_service_pull:
+    image: opennode/waldur-slurm-service:latest
+    container_name: waldur_slurm_service_pull
+    env_file: ${CONFIG_FOLDER}/waldur-slurm-service/service-pull-env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  slurm_service_push:
+    image: opennode/waldur-slurm-service:latest
+    container_name: waldur_slurm_service_push
+    env_file: ${CONFIG_FOLDER}/waldur-slurm-service/service-push-env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+networks:
+  default:
+    name: waldur-external
+    external: true
