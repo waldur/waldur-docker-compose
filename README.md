@@ -106,3 +106,79 @@ docker restart keycloak
 ```
 
 Login to the admin interface at [https://localhost/auth/admin](https://localhost/auth/admin) and create Waldur users
+
+## Inegration with SLURM
+
+SLURM integration requires several major actions.
+
+The preparation step is creation of a shared network for Waldur and FireCREST:
+
+```bash
+docker network create waldur-external
+```
+
+This network will be used for communication between Waldur and FireCREST services.
+
+### Deployment of FirecREST
+
+**NB**: FirecREST integration is not implemented for now. Better check the [Waldur SLURM service setup](#service-provider-setup).
+
+The first step is deployment of [FirecREST demo](https://github.com/eth-cscs/firecrest). This repository includes build-in SLURM cluster together with FirecREST application itself and several utils (keycloak, minio, jaeger, openapi). An user needs to replace the default keycloak configuration in the firecrest repository. For this, the user should execute the following commands:
+
+```bash
+echo config/firecrest-override/config.json > firecrest/deploy/demo/keycloak/config.json
+echo config/firecrest-override/client_secrets.json > firecrest/deploy/demo/demo_client/client_secrets.json
+echo config/firecrest-override/docker-compose.yml > firecrest/deploy/demo/docker-compose.yml
+```
+
+Firecrest deployment can be started with these commands:
+
+```bash
+cd deploy/demo/
+chmod 400 ../test-build/environment/keys/ca-key ../test-build/environment/keys/user-key
+docker build -f base/Dockerfile . -t f7t-base
+docker-compose build --build-arg SLURM_VERSION=20.11.9
+docker-compose up -d
+```
+
+### Update of Waldur setup
+
+Waldur setting should be updated in order to interact with Keycloak service from FireCREST and with [FreeIPA demo](https://www.freeipa.org/page/Demo).
+
+```bash
+echo config/waldur-slurm-service/override.conf.py > config/waldur-mastermind/override.conf.py
+```
+
+The deployment should be restarted with the fresh settings.
+
+```bash
+docker compose down
+docker compose up -d
+```
+
+### Service provider setup
+
+After this, the service provider should import the SLURM cluster to Waldur. This can be done on Waldur marketplace level, so the result is an offering with the corresponding data.
+
+- Go to `Public services` -> `Public offerings` -> `Add offering`
+- Input name and other offering details and choose `SLURM remote allocation` in "Management" tab
+- In the page of the new offering, copy uuid from URL (see image below)
+
+![offering-uuid](img/offering-uuid.png)
+
+The copied value will be used for deployment of Waldur-SLURM integration service as `WALDUR_OFFERING_UUID` variable.
+
+- Go to user management tab, set API token lifetime to `token will not time out` and click `Update profile` button. See [the example](https://docs.waldur.com/integrator-guide/APIs/authentication/#authentication-token-management) for more details
+- Copy value from `Current API token` field. This value will be used as `WALDUR_API_TOKEN`
+
+The value of `WALDUR_API_TOKEN` and `WALDUR_OFFERING_UUID` variables should be adjusted in `config/waldur-slurm-service/service-pull-env` and `config/waldur-slurm-service/service-push-env` files.
+
+### Deployment of Waldur SLURM service
+
+The final action is deployment of `waldur-slurm-service` module, which is responsible for data synchronization between Waldur and SLURM cluster and modification of corresponding object states in these 2 systems. The user needs to start the deployment in the following way in order to enable `waldur-slurm-service` module:
+
+```bash
+docker compose -f docker-compose.yml -f waldur-slurm-service.yml up -d
+```
+
+For more configuration details, check [Waldur SLURM service guide](https://code.opennodecloud.com/waldur/waldur-slurm-service/-/blob/main/README.md).
