@@ -89,6 +89,7 @@ Upload configuration guide:
   variables:
     GUIDE_PATH: docs/admin-guide/deployment/docker-compose.md
     API_DOCS_PATH: docs/API/
+    IMG_TARGET_PATH: docs/admin-guide/deployment/img
   script:
     - cd /tmp/
     - git clone "https://gitlab-ci-token:$GITLAB_TOKEN@$CI_SERVER_HOST/waldur/waldur-docs.git"
@@ -99,6 +100,8 @@ Upload configuration guide:
     - mkdir -p $API_DOCS_PATH
     - cp -vf ${CI_BUILDS_DIR}/${CI_PROJECT_PATH}/docs/* $API_DOCS_PATH
     - git add $API_DOCS_PATH
-    - git commit $GUIDE_PATH $API_DOCS_PATH -m "Update configuration guide and API docs" || exit 0
+    - mkdir -p docs/admin-guide/deployment/img
+    - cp -vf ${CI_BUILDS_DIR}/${CI_PROJECT_PATH}/img/* $IMG_TARGET_PATH
+    - git commit $GUIDE_PATH $API_DOCS_PATH $IMG_TARGET_PATH -m "Update configuration guide and API docs" || exit 0
     - git branch new-configuration-guide
     - git push --set-upstream origin new-configuration-guide:master
