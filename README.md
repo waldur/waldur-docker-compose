@@ -107,7 +107,7 @@ docker restart keycloak
 
 Login to the admin interface at [https://localhost/auth/admin](https://localhost/auth/admin) and create Waldur users
 
-## Inegration with SLURM
+## Integration with SLURM
 
 SLURM integration requires several major actions.
 
@@ -126,17 +126,18 @@ This network will be used for communication between Waldur and FireCREST service
 The first step is deployment of [FirecREST demo](https://github.com/eth-cscs/firecrest). This repository includes build-in SLURM cluster together with FirecREST application itself and several utils (keycloak, minio, jaeger, openapi). An user needs to replace the default keycloak configuration in the firecrest repository. For this, the user should execute the following commands:
 
 ```bash
-echo config/firecrest-override/config.json > firecrest/deploy/demo/keycloak/config.json
-echo config/firecrest-override/client_secrets.json > firecrest/deploy/demo/demo_client/client_secrets.json
-echo config/firecrest-override/docker-compose.yml > firecrest/deploy/demo/docker-compose.yml
+cat config/firecrest-override/config.json > firecrest/deploy/demo/keycloak/config.json
+cat config/firecrest-override/client_secrets.json > firecrest/deploy/demo/demo_client/client_secrets.json
+cat config/firecrest-override/docker-compose.yml > firecrest/deploy/demo/docker-compose.yml
 ```
 
 Firecrest deployment can be started with these commands:
 
 ```bash
+cd firecrest
+docker build -f deploy/docker/base/Dockerfile . -t f7t-base
 cd deploy/demo/
 chmod 400 ../test-build/environment/keys/ca-key ../test-build/environment/keys/user-key
-docker build -f base/Dockerfile . -t f7t-base
 docker-compose build --build-arg SLURM_VERSION=20.11.9
 docker-compose up -d
 ```
@@ -146,7 +147,7 @@ docker-compose up -d
 Waldur setting should be updated in order to interact with Keycloak service from FireCREST and with [FreeIPA demo](https://www.freeipa.org/page/Demo).
 
 ```bash
-echo config/waldur-slurm-service/override.conf.py > config/waldur-mastermind/override.conf.py
+cat config/firecrest-override/override.conf.py > config/waldur-mastermind/override.conf.py
 ```
 
 The deployment should be restarted with the fresh settings.
