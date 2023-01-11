@@ -11,6 +11,7 @@ x-mastermind-environment:
   - SENTRY_DSN=${SENTRY_DSN}
   - GLOBAL_DEBUG=${GLOBAL_DEBUG}
   - KEYCLOAK_SECRET=${KEYCLOAK_SECRET}
+  - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT}
 
 x-mastermind-volumes:
   &default-mastermind-volumes
