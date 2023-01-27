@@ -1,1 +1,0 @@
-# Directory with templates

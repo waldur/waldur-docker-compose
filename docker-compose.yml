@@ -26,7 +26,7 @@ x-mastermind-volumes:
   - ${CONFIG_FOLDER}/waldur-mastermind/saml2/credentials:/etc/waldur/saml2/credentials
   - ${CONFIG_FOLDER}/waldur-mastermind/saml2/metadata:/etc/waldur/saml2/metadata
   - ${CONFIG_FOLDER}/waldur-mastermind/valimo:/etc/waldur/valimo
-  - ${CONFIG_FOLDER}/waldur-mastermind/templates:/etc/waldur/templates
+  - ${CONFIG_FOLDER}/waldur-mastermind/notification-templates.yaml:/etc/waldur/notification-templates.yaml
   - ${LIB_FOLDER}:/var/lib/waldur
   - /var/run/docker.sock:/var/run/docker.sock
   - /dev/shm/waldur-script-launchzone:/dev/shm/waldur-script-launchzone
