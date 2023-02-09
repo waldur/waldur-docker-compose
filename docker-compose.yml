@@ -12,7 +12,6 @@ x-mastermind-environment:
   - GLOBAL_DEBUG=${GLOBAL_DEBUG}
   - KEYCLOAK_SECRET=${KEYCLOAK_SECRET}
   - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT}
-  - WALDUR_PDF_SERVER_URL=http://waldur-chrome:3000/pdf
 
 x-mastermind-volumes:
   &default-mastermind-volumes
@@ -57,16 +56,6 @@ services:
     image: '${DOCKER_REGISTRY_PREFIX}bitnami/redis:latest'
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
-    restart: always
-
-  # Chrome
-  waldur-chrome:
-    container_name: waldur-chrome
-    image: '${DOCKER_REGISTRY_PREFIX}browserless/chrome'
-    ports:
-      - "3000:3000"
-    environment:
-      - EXIT_ON_HEALTH_FAILURE=true
     restart: always
 
   # DB migration
