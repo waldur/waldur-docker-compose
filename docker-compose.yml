@@ -12,6 +12,13 @@ x-mastermind-environment:
   - GLOBAL_DEBUG=${GLOBAL_DEBUG}
   - KEYCLOAK_SECRET=${KEYCLOAK_SECRET}
   - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT}
+  - POWERED_BY_LOGO=${POWERED_BY_LOGO}
+  - HERO_IMAGE=${HERO_IMAGE}
+  - SIDEBAR_LOGO=${SIDEBAR_LOGO}
+  - SIDEBAR_LOGO_MOBILE=${SIDEBAR_LOGO_MOBILE}
+  - SITE_LOGO=${SITE_LOGO}
+  - LOGIN_LOGO=${LOGIN_LOGO}
+  - FAVICON=${FAVICON}
 
 x-mastermind-volumes:
   &default-mastermind-volumes
@@ -27,6 +34,7 @@ x-mastermind-volumes:
   - ${CONFIG_FOLDER}/waldur-mastermind/saml2/metadata:/etc/waldur/saml2/metadata
   - ${CONFIG_FOLDER}/waldur-mastermind/valimo:/etc/waldur/valimo
   - ${CONFIG_FOLDER}/waldur-mastermind/notification-templates.yaml:/etc/waldur/notification-templates.yaml
+  - ${CONFIG_FOLDER}/whitelabeling:/etc/waldur/icons
   - ${LIB_FOLDER}:/var/lib/waldur
   - /var/run/docker.sock:/var/run/docker.sock
   - /dev/shm/waldur-script-launchzone:/dev/shm/waldur-script-launchzone
