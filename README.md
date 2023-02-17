@@ -183,3 +183,37 @@ docker compose -f docker-compose.yml -f waldur-slurm-service.yml up -d
 ```
 
 For more configuration details, check [Waldur SLURM service guide](https://code.opennodecloud.com/waldur/waldur-slurm-service/-/blob/main/README.md).
+
+### Whitelabeling settings
+
+To set up whitelabeling You'll need to set environmental variables.
+You can see the list of all whitelabeling variables below.
+
+#### General whitelabeling settings
+
+- SITE_NAME
+- SITE_ADDRESS
+- SITE_EMAIL
+- SITE_PHONE
+- SHORT_PAGE_TITLE
+- FULL_PAGE_TITLE
+- BRAND_COLOR
+- HERO_LINK_LABEL
+- HERO_LINK_URL
+- SITE_DESCRIPTION
+- CURRENCY_NAME
+- DOCS_URL
+
+#### Logos and images of whitelabeling
+
+The path to a logo is constructed like so:
+/etc/waldur/icons - is a path in the container (Keep it like it is) + the name of the logo file from config/whitelabeling directory.
+
+All-together /etc/waldur/icons/file_name_from_whitelabeling_directory
+
+- SITE_LOGO
+- LOGIN_LOGO
+- SIDEBAR_LOGO
+- POWERED_BY_LOGO
+- FAVICON
+- HERO_IMAGE
