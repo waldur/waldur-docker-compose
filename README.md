@@ -203,6 +203,7 @@ You can see the list of all whitelabeling variables below.
 - SITE_DESCRIPTION
 - CURRENCY_NAME
 - DOCS_URL
+- SUPPORT_PORTAL_URL
 
 #### Logos and images of whitelabeling
 
