@@ -31,6 +31,7 @@ x-mastermind-environment:
   - SITE_DESCRIPTION=${SITE_DESCRIPTION}
   - CURRENCY_NAME=${CURRENCY_NAME}
   - DOCS_URL=${DOCS_URL}
+  - SUPPORT_PORTAL_URL=${SUPPORT_PORTAL_URL}
 
 x-mastermind-volumes:
   &default-mastermind-volumes
