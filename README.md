@@ -32,10 +32,10 @@ docker exec -t waldur-mastermind-worker waldur createstaffuser -u admin -p passw
 docker exec -t waldur-mastermind-worker waldur load_categories vpc vm storage
 ```
 
-Waldur HomePort will be accessible on [http://localhost](http://localhost).
-API will listen on [http://localhost/api](http://localhost/api).
+Waldur HomePort will be accessible on [https://localhost](https://localhost).
+API will listen on [https://localhost/api](https://localhost/api).
 
-Healthcheck can be accessed on [http://localhost/health-check](http://localhost/health-check).
+Healthcheck can be accessed on [https://localhost/health-check](https://localhost/health-check).
 
 Tearing down and cleaning up:
 
