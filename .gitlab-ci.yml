@@ -70,9 +70,9 @@ Test compose configuration:
     - pip install docker-compose
     - |
       if [ "$TRIGGER_PROJECT_NAME" == "waldur-mastermind" ]; then
-        export WALDUR_MASTERMIND_IMAGE_TAG=${TRIGGER_IMAGE_TAG#v}
+        export WALDUR_MASTERMIND_IMAGE_TAG=${TRIGGER_IMAGE_TAG}
       elif [ "$TRIGGER_PROJECT_NAME" == "waldur-homeport" ]; then
-        export WALDUR_HOMEPORT_IMAGE_TAG=${TRIGGER_IMAGE_TAG#v}
+        export WALDUR_HOMEPORT_IMAGE_TAG=${TRIGGER_IMAGE_TAG}
       fi
   artifacts:
     # Saving generated doc files for further configuration uploading
