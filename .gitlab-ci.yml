@@ -37,7 +37,7 @@ Test compose configuration:
     - docker context list
     - docker info
     - docker-compose config
-    - docker-compose up waldur-mastermind-db-migration || docker logs --tail=100 waldur-mastermind-db-migration
+    - docker-compose up waldur-mastermind-db-migration
     - docker-compose logs --tail=100 waldur-mastermind-db-migration
     - docker-compose up -d
     - docker-compose ps
