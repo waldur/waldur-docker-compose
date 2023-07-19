@@ -64,6 +64,7 @@ Test compose configuration:
       done
   before_script:
     - apk add docker-compose
+    - apk add curl
     - |
       if [ "$TRIGGER_PROJECT_NAME" == "waldur-mastermind" ]; then
         export WALDUR_MASTERMIND_IMAGE_TAG=${TRIGGER_IMAGE_TAG}
