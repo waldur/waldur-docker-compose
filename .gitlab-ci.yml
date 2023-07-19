@@ -37,6 +37,8 @@ Test compose configuration:
     - docker context list
     - docker info
     - docker-compose config
+    - docker-compose up waldur-db
+    - docker-compose ps
     - docker-compose up -d
     - docker-compose ps
     - docker-compose exec waldur-mastermind-worker status
