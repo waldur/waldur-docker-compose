@@ -63,11 +63,7 @@ Test compose configuration:
         echo "- [$item_cap]($item-api.md)" >> docs/index.md
       done
   before_script:
-    - apk update
-    - apk add py-pip python3-dev libffi-dev openssl-dev gcc libc-dev make curl
-    - curl --proto '=https' --tlsv1.3 https://sh.rustup.rs -sSf | sh -s -- -y
-    - source "$HOME/.cargo/env"
-    - pip install docker-compose
+    - apk add docker-compose
     - |
       if [ "$TRIGGER_PROJECT_NAME" == "waldur-mastermind" ]; then
         export WALDUR_MASTERMIND_IMAGE_TAG=${TRIGGER_IMAGE_TAG}
