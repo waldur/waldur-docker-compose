@@ -1,0 +1,9 @@
+- provider: "keycloak"
+  label: "Keycloak"
+  clientId: "waldur"
+  clientSecret: "CHANGEME_KEYCLOAK_CLIENT_SECRET"
+  discoveryUrl: "http://keycloak:8080/auth/realms/Waldur/.well-known/openid-configuration"
+  managementUrl: ""
+  protectedFields:
+    - "full_name"
+    - "email"
