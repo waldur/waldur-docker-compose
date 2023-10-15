@@ -39,7 +39,6 @@ x-mastermind-volumes:
   - ${CONFIG_FOLDER}/waldur-mastermind/logging.conf.py:/etc/waldur/logging.conf.py
   - ${CONFIG_FOLDER}/waldur-mastermind/beat:/usr/local/bin/beat
   - ${CONFIG_FOLDER}/waldur-mastermind/worker:/usr/local/bin/worker
-  - ${CONFIG_FOLDER}/waldur-mastermind/uwsgi.ini:/etc/waldur/uwsgi.ini
   - ${CONFIG_FOLDER}/waldur-mastermind/saml2.conf.py:/etc/waldur/saml2.conf.py
   - ${CONFIG_FOLDER}/waldur-mastermind/id_rsa:/etc/waldur/id_rsa
   - ${CONFIG_FOLDER}/waldur-mastermind/id_rsa.pub:/etc/waldur/id_rsa.pub

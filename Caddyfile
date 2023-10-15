@@ -12,14 +12,14 @@
       header_down -Server
    }
 
-    reverse_proxy /api/* http://waldur-mastermind-api:8080
-    reverse_proxy /api-auth/* http://waldur-mastermind-api:8080
-    reverse_proxy /docs/* http://waldur-mastermind-api:8080
-    reverse_proxy /admin/* http://waldur-mastermind-api:8080
-    reverse_proxy /static/* http://waldur-mastermind-api:8080
-    reverse_proxy /media/* http://waldur-mastermind-api:8080
-    reverse_proxy /apidocs/* http://waldur-mastermind-api:8080
-    reverse_proxy /health-check/* http://waldur-mastermind-api:8080
+    reverse_proxy /api/* http://waldur-mastermind-api:80
+    reverse_proxy /api-auth/* http://waldur-mastermind-api:80
+    reverse_proxy /docs/* http://waldur-mastermind-api:80
+    reverse_proxy /admin/* http://waldur-mastermind-api:80
+    reverse_proxy /static/* http://waldur-mastermind-api:80
+    reverse_proxy /media/* http://waldur-mastermind-api:80
+    reverse_proxy /apidocs/* http://waldur-mastermind-api:80
+    reverse_proxy /health-check/* http://waldur-mastermind-api:80
     reverse_proxy /auth/* http://keycloak:8080
 
     import /etc/caddy-includes/*.conf
