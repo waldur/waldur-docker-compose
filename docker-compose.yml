@@ -50,7 +50,11 @@ x-mastermind-volumes:
   - ${CONFIG_FOLDER}/whitelabeling:/etc/waldur/icons
   - ${LIB_FOLDER}:/var/lib/waldur
   - /var/run/docker.sock:/var/run/docker.sock
-  - /dev/shm/waldur-script-launchzone:/dev/shm/waldur-script-launchzone
+  - /opt/waldur-script-launchzone:/opt/waldur-script-launchzone
+
+x-mastermind-hosts:
+  &default-mastermind-hosts
+  - ${EXTRA_HOST}
 
 services:
   # PostgreSQL
@@ -110,6 +114,7 @@ services:
       retries: 3
     command: worker
     restart: always
+    extra_hosts: *default-mastermind-hosts
 
   # Celery-beat
   waldur-mastermind-beat:
@@ -124,6 +129,7 @@ services:
         condition: service_started
     command: beat
     restart: always
+    extra_hosts: *default-mastermind-hosts
 
   # MasterMind API
   waldur-mastermind-api:
@@ -142,6 +148,7 @@ services:
         condition: service_started
     command: mastermind
     restart: always
+    extra_hosts: *default-mastermind-hosts
 
   # HomePort
   waldur-homeport:
