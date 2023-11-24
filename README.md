@@ -109,101 +109,29 @@ Login to the admin interface at [https://localhost/auth/admin](https://localhost
 
 ## Integration with SLURM
 
-SLURM integration requires several major actions.
-
-The preparation step is creation of a shared network for Waldur and FireCREST:
-
-```bash
-docker network create waldur-external
-```
-
-This network will be used for communication between Waldur and FireCREST services.
-
-### Deployment of FirecREST
-
-**NB**: FirecREST integration is not implemented for now. Better check the [Waldur SLURM service setup](#service-provider-setup).
-
-The first step is deployment of [FirecREST demo](https://github.com/eth-cscs/firecrest). This repository includes build-in SLURM cluster together with FirecREST application itself and several utils (keycloak, minio, jaeger, openapi). An user needs to replace the default keycloak configuration in the firecrest repository. For this, the user should execute the following commands:
-
-```bash
-cat config/firecrest-override/config.json > firecrest/deploy/demo/keycloak/config.json
-cat config/firecrest-override/client_secrets.json > firecrest/deploy/demo/demo_client/client_secrets.json
-cat config/firecrest-override/docker-compose.yml > firecrest/deploy/demo/docker-compose.yml
-```
-
-Firecrest deployment can be started with these commands:
-
-```bash
-cd firecrest
-docker build -f deploy/docker/base/Dockerfile . -t f7t-base
-cd deploy/demo/
-chmod 400 ../test-build/environment/keys/ca-key ../test-build/environment/keys/user-key
-docker-compose build --build-arg SLURM_VERSION=20.11.9
-docker-compose up -d
-```
-
-### Update of Waldur setup
-
-Waldur setting should be updated in order to interact with Keycloak service from FireCREST and with [FreeIPA demo](https://www.freeipa.org/page/Demo).
-
-```bash
-cat config/firecrest-override/override.conf.py > config/waldur-mastermind/override.conf.py
-```
-
-The deployment should be restarted with the fresh settings.
-
-```bash
-docker compose down
-docker compose up -d
-```
-
-### Service provider setup
-
-After this, the service provider should import the SLURM cluster to Waldur. This can be done on Waldur marketplace level, so the result is an offering with the corresponding data.
-
-- Go to `Public services` -> `Public offerings` -> `Add offering`
-- Input name and other offering details and choose `SLURM remote allocation` in "Management" tab
-- In the page of the new offering, copy uuid from URL (see image below)
-
-![offering-uuid](img/offering-uuid.png)
-
-The copied value will be used for deployment of Waldur-SLURM integration service as `WALDUR_OFFERING_UUID` variable.
-
-- Go to user management tab, set API token lifetime to `token will not time out` and click `Update profile` button. See [the example](https://docs.waldur.com/integrator-guide/APIs/authentication/#authentication-token-management) for more details
-- Copy value from `Current API token` field. This value will be used as `WALDUR_API_TOKEN`
-
-The value of `WALDUR_API_TOKEN` and `WALDUR_OFFERING_UUID` variables should be adjusted in `config/waldur-slurm-service/service-pull-env` and `config/waldur-slurm-service/service-push-env` files.
-
-### Deployment of Waldur SLURM service
-
-The final action is deployment of `waldur-slurm-service` module, which is responsible for data synchronization between Waldur and SLURM cluster and modification of corresponding object states in these 2 systems. The user needs to start the deployment in the following way in order to enable `waldur-slurm-service` module:
-
-```bash
-docker compose -f docker-compose.yml -f waldur-slurm-service.yml up -d
-```
-
-For more configuration details, check [Waldur SLURM service guide](https://code.opennodecloud.com/waldur/waldur-slurm-service/-/blob/main/README.md).
+The integration is described [here](https://docs.waldur.com/admin-guide/providers/remote-slurm/).
 
 ### Whitelabeling settings
 
-To set up whitelabeling You'll need to set environmental variables.
-You can see the list of all whitelabeling variables below.
+To set up whitelabeling, you need to define settings in `./config/waldur-mastermind/whitelabeling.yaml`.
+You can see the list of all whitelabeling options below.
 
 #### General whitelabeling settings
 
-- SITE_NAME
-- SITE_ADDRESS
-- SITE_EMAIL
-- SITE_PHONE
-- SHORT_PAGE_TITLE
-- FULL_PAGE_TITLE
-- BRAND_COLOR
-- HERO_LINK_LABEL
-- HERO_LINK_URL
-- SITE_DESCRIPTION
-- CURRENCY_NAME
-- DOCS_URL
-- SUPPORT_PORTAL_URL
+- site_name
+- site_address
+- site_email
+- site_phone
+- short_page_title
+- full_page_title
+- brand_color
+- brand_label_color
+- hero_link_label
+- hero_link_url
+- site_description
+- currency_name
+- docs_url
+- support_portal_url
 
 #### Logos and images of whitelabeling
 
@@ -212,9 +140,10 @@ The path to a logo is constructed like so:
 
 All-together /etc/waldur/icons/file_name_from_whitelabeling_directory
 
-- SITE_LOGO
-- LOGIN_LOGO
-- SIDEBAR_LOGO
-- POWERED_BY_LOGO
-- FAVICON
-- HERO_IMAGE
+- powered_by_logo
+- hero_image
+- sidebar_logo
+- sidebar_logo_mobile
+- site_logo
+- login_logo
+- favicon

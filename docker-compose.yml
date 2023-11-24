@@ -12,26 +12,6 @@ x-mastermind-environment:
   - GLOBAL_DEBUG=${GLOBAL_DEBUG}
   - KEYCLOAK_SECRET=${KEYCLOAK_SECRET}
   - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT}
-  - POWERED_BY_LOGO=${POWERED_BY_LOGO}
-  - HERO_IMAGE=${HERO_IMAGE}
-  - SIDEBAR_LOGO=${SIDEBAR_LOGO}
-  - SIDEBAR_LOGO_MOBILE=${SIDEBAR_LOGO_MOBILE}
-  - SITE_LOGO=${SITE_LOGO}
-  - LOGIN_LOGO=${LOGIN_LOGO}
-  - FAVICON=${FAVICON}
-  - SITE_NAME=${SITE_NAME}
-  - FULL_PAGE_TITLE=${FULL_PAGE_TITLE}
-  - SITE_ADDRESS=${SITE_ADDRESS}
-  - SITE_EMAIL=${SITE_EMAIL}
-  - SITE_PHONE=${SITE_PHONE}
-  - SHORT_PAGE_TITLE=${SHORT_PAGE_TITLE}
-  - BRAND_COLOR=${BRAND_COLOR}
-  - HERO_LINK_LABEL=${HERO_LINK_LABEL}
-  - HERO_LINK_URL=${HERO_LINK_URL}
-  - SITE_DESCRIPTION=${SITE_DESCRIPTION}
-  - CURRENCY_NAME=${CURRENCY_NAME}
-  - DOCS_URL=${DOCS_URL}
-  - SUPPORT_PORTAL_URL=${SUPPORT_PORTAL_URL}
 
 x-mastermind-volumes:
   &default-mastermind-volumes
@@ -95,6 +75,20 @@ services:
       waldur-queue:
         condition: service_started
     command: initdb
+
+  # Whitelabeling initialization
+  waldur-mastermind-whitelabeling-init:
+    container_name: waldur-mastermind-whitelabeling-init
+    image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    environment: *default-mastermind-env
+    volumes:
+      - ${CONFIG_FOLDER}/waldur-mastermind/whitelabeling.yaml:/etc/waldur/whitelabeling.yaml
+      - ${CONFIG_FOLDER}/waldur-mastermind/override.conf.py:/etc/waldur/override.conf.py
+      - ${CONFIG_FOLDER}/waldur-mastermind/logging.conf.py:/etc/waldur/logging.conf.py
+    depends_on:
+      waldur-db:
+        condition: service_healthy
+    command: init-whitelabeling
 
   # Celery
   waldur-mastermind-worker:
