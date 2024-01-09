@@ -19,10 +19,10 @@ cp .env.example .env
 
 ```bash
 # start containers
-docker-compose up -d
+docker compose up -d
 
 # verify
-docker-compose ps
+docker compose ps
 docker exec -t waldur-mastermind-worker status
 
 # Create user
@@ -40,7 +40,7 @@ Healthcheck can be accessed on [https://localhost/health-check](https://localhos
 Tearing down and cleaning up:
 
 ```bash
-docker-compose down
+docker compose down
 ```
 
 ## Logs
@@ -58,8 +58,8 @@ This issue would be resolved after upgrade to [Docker Compose 1.29](https://docs
 ## Upgrading Waldur
 
 ```bash
-docker-compose pull
-docker-compose restart
+docker compose pull
+docker compose restart
 ```
 
 ## Using TLS
