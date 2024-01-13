@@ -55,6 +55,11 @@ It means that you may need to wait few minutes until these migrations are applie
 Otherwise you may observe HTTP error 500 rendered by REST API server.
 This issue would be resolved after upgrade to [Docker Compose 1.29](https://docs.docker.com/compose/release-notes/#1290).
 
+To use a custom script offering type, it should be possible to connect to `/var/run/docker.sock` from
+within the Waldur containers. If you are getting a permission denied error in logs, try setting more
+open permissions, for example, `chmod 666 /var/run/docker.sock`. Note that this is not a secure
+setup, so make sure you understand what you are doing.
+
 ## Upgrading Waldur
 
 ```bash
