@@ -103,14 +103,9 @@ To add additional caddy config snippets into the caddy virtual host configuratio
 
 Keycloak is an Identity and Access Management software bundled with waldur-docker-compose.
 
-To create a keycloak admin account run:
+To create a keycloak admin account set `KEYCLOAK_ADMIN` env variable in `docker-compose.yaml` and `KEYCLOAK_ADMIN_PASSWORD` in `.env` file.
 
-```bash
-docker exec keycloak /opt/jboss/keycloak/bin/add-user-keycloak.sh -u <USERNAME> -p <PASSWORD>
-docker restart keycloak
-```
-
-Login to the admin interface at [https://localhost/auth/admin](https://localhost/auth/admin) and create Waldur users
+After this, you can login to the admin interface at [https://localhost/auth/admin](https://localhost/auth/admin) and create Waldur users.
 
 ## Integration with SLURM
 
