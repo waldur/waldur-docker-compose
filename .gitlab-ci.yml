@@ -104,3 +104,11 @@ Upload configuration guide:
     - git commit $GUIDE_PATH $API_DOCS_PATH $IMG_TARGET_PATH -m "Update configuration guide and API docs" || exit 0
     - git branch new-configuration-guide
     - git push --set-upstream origin new-configuration-guide:master
+
+# Override default rules so the job runs for tags automatically
+Trigger dev env update:
+  rules:
+    - if: '$SKIP_DEV_UPDATE == "true" || $SKIP_DEV_UPDATE == "yes"'
+      when: never
+    - if: $CI_COMMIT_TAG
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
