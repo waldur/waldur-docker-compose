@@ -12,7 +12,10 @@
       header_down -Server
    }
 
-    reverse_proxy /api/* http://waldur-mastermind-api:80
+    reverse_proxy /api/* http://waldur-mastermind-api:80 {
+      # for 4xx codes caddy doesn't return CORS headers which breaks authentication redirects
+      header_down Access-Control-Allow-Origin "{header.origin}"
+    }
     reverse_proxy /api-auth/* http://waldur-mastermind-api:80
     reverse_proxy /docs/* http://waldur-mastermind-api:80
     reverse_proxy /admin/* http://waldur-mastermind-api:80
