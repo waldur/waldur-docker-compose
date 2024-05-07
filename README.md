@@ -107,6 +107,12 @@ To create a keycloak admin account set `KEYCLOAK_ADMIN` env variable in `docker-
 
 After this, you can login to the admin interface at [https://localhost/auth/admin](https://localhost/auth/admin) and create Waldur users.
 
+To use Keycloak as an identity provider within Waldur, follow the instruction [here](https://docs.waldur.com/admin-guide/identities/keycloak/).
+The discovery url to connect to Keycloak from the waldur-mastermind-api container is: 
+```bash
+http://keycloak:8080/auth/realms/<YOUR REALM>/.well-known/openid-configuration
+```
+
 ## Integration with SLURM
 
 The integration is described [here](https://docs.waldur.com/admin-guide/providers/remote-slurm/).
