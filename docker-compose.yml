@@ -28,6 +28,7 @@ x-mastermind-volumes:
   - ${CONFIG_FOLDER}/waldur-mastermind/notification-templates.yaml:/etc/waldur/notification-templates.yaml
   - ${CONFIG_FOLDER}/waldur-mastermind/auth.yaml:/etc/waldur/auth.yaml
   - ${CONFIG_FOLDER}/waldur-mastermind/support.yaml:/etc/waldur/support.yaml
+  - ${CONFIG_FOLDER}/waldur-mastermind/whitelabeling.yaml:/etc/waldur/whitelabeling.yaml
   - ${CONFIG_FOLDER}/whitelabeling:/etc/waldur/icons
   - ${LIB_FOLDER}:/var/lib/waldur
   - /var/run/docker.sock:/var/run/docker.sock
@@ -82,10 +83,7 @@ services:
     container_name: waldur-mastermind-whitelabeling-init
     image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
     environment: *default-mastermind-env
-    volumes:
-      - ${CONFIG_FOLDER}/waldur-mastermind/whitelabeling.yaml:/etc/waldur/whitelabeling.yaml
-      - ${CONFIG_FOLDER}/waldur-mastermind/override.conf.py:/etc/waldur/override.conf.py
-      - ${CONFIG_FOLDER}/waldur-mastermind/logging.conf.py:/etc/waldur/logging.conf.py
+    volumes: *default-mastermind-volumes
     depends_on:
       waldur-db:
         condition: service_healthy
