@@ -42,7 +42,7 @@ services:
   # PostgreSQL
   waldur-db:
     container_name: waldur-db
-    image: '${DOCKER_REGISTRY_PREFIX}library/postgres:16'
+    image: '${DOCKER_REGISTRY_PREFIX}library/postgres:12'
     user: root
     environment:
       - POSTGRES_USER=waldur
