@@ -50,23 +50,13 @@ services:
       - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256
     volumes:
       - "./pgsql:/var/lib/postgresql/data"
+      - "./config/createdb-celery_results.sql:/docker-entrypoint-initdb.d/createdb-celery_results.sql"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U waldur"]
       interval: 30s
       timeout: 30s
       retries: 3
     restart: always
-
-  # Create celery_results database in waldur-db
-  create-celery-results-db:
-    image: '${DOCKER_REGISTRY_PREFIX}library/postgres:${WALDUR_POSTGRES_IMAGE_TAG}'
-    command: ["sh", "-c", "createdb -h waldur-db --no-password celery_results || true"]
-    environment:
-      - PGUSER=waldur
-      - PGPASSWORD=${POSTGRESQL_PASSWORD}
-    depends_on:
-      waldur-db:
-        condition: service_healthy
 
   # RabbitMQ
   waldur-queue:
@@ -131,8 +121,6 @@ services:
         condition: service_healthy
       waldur-queue:
         condition: service_started
-      create-celery-results-db:
-        condition: service_completed_successfully
       waldur-launchzone-init-volume:
         condition: service_completed_successfully
     healthcheck:
