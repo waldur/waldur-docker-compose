@@ -20,6 +20,20 @@ LOGGING = {
         },
     },
 
+    'loggers': {
+        # Suppress excessive Celery task registration logging
+        'celery.utils.imports': {
+            'level': 'WARNING',
+            'handlers': ['console'],
+            'propagate': False,
+        },
+        'celery.app.autodiscover': {
+            'level': 'WARNING',
+            'handlers': ['console'],
+            'propagate': False,
+        },
+    },
+
     'root': {
         'level': 'DEBUG',
         'handlers': ['console'],
