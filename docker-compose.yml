@@ -279,6 +279,7 @@ services:
         - MAX_AGE=365
         - MIX_ERR=true
         - DEBUG=false
+        - DOCKER_GID=0
         - INCLUDE=waldur-db,waldur-queue,waldur-mastermind-db-migration,waldur-mastermind-worker,waldur-mastermind-beat,waldur-mastermind-api,waldur-homeport,caddy,keycloak
     volumes:
         - ${LOG_FOLDER}:/srv/logs
