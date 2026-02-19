@@ -262,7 +262,7 @@ services:
     restart: always
 
   logger:
-    image: '${DOCKER_REGISTRY_PREFIX}umputun/docker-logger'
+    image: '${DOCKER_REGISTRY_PREFIX}umputun/docker-logger:v1.3.0'
     container_name: "logger"
     hostname: "logger"
     restart: always
@@ -279,7 +279,6 @@ services:
         - MAX_AGE=365
         - MIX_ERR=true
         - DEBUG=false
-        - DOCKER_GID=0
         - INCLUDE=waldur-db,waldur-queue,waldur-mastermind-db-migration,waldur-mastermind-worker,waldur-mastermind-beat,waldur-mastermind-api,waldur-homeport,caddy,keycloak
     volumes:
         - ${LOG_FOLDER}:/srv/logs
