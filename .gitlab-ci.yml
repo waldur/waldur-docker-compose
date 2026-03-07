@@ -45,6 +45,7 @@ Test compose configuration:
     - docker context list
     - docker info
     - docker compose config
+    - docker compose --profile keycloak config
     - echo "Pulling images:"
     - docker compose pull
     - echo "Images pulled:"
