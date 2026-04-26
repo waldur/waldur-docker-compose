@@ -219,7 +219,7 @@ services:
 
   keycloak:
     container_name: keycloak
-    image: '${DOCKER_REGISTRY_PREFIX}keycloak/keycloak:25.0'
+    image: '${DOCKER_REGISTRY_PREFIX}keycloak/keycloak:26.6.1'
     profiles: [keycloak]
     restart: always
     environment:
