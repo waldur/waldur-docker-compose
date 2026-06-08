@@ -284,6 +284,10 @@ The discovery url to connect to Keycloak from the waldur-mastermind-api containe
 http://keycloak:8080/auth/realms/<YOUR REALM>/.well-known/openid-configuration
 ```
 
+## Matrix chat add-on
+
+Two optional Compose profiles bring up a self-contained Matrix homeserver alongside Waldur — `matrix` for chat and `matrix-rtc` for Element Call voice/video. Activation, the one-time appservice registration, troubleshooting, and the rest of the operator guide live in [docs/matrix-chat-add-on.md](docs/matrix-chat-add-on.md).
+
 ## Integration with SLURM
 
 The integration is described [here](https://docs.waldur.com/latest/admin-guide/providers/site-agent/).

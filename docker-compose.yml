@@ -268,6 +268,152 @@ services:
       retries: 3
     restart: always
 
+  # --- Matrix chat add-on ---
+  # Activate with: docker compose --profile matrix up -d
+  # Add --profile matrix-rtc to enable Element Call (LiveKit voice/video).
+  # See README "Matrix chat add-on" section for one-time appservice
+  # registration steps and operational notes.
+
+  # Fix ownership of the matrix secrets volume so the init script can
+  # write to it as the 1001 user. Mirrors waldur-launchzone-init-volume.
+  waldur-matrix-init-volume:
+    container_name: waldur-matrix-init-volume
+    profiles: [matrix]
+    image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    user: root
+    volumes:
+      - waldur_matrix_secrets:/var/lib/waldur/matrix
+    command: chown -R 1001:${DOCKER_GROUP_ID} /var/lib/waldur/matrix
+    restart: "no"
+
+  waldur-matrix-init:
+    container_name: waldur-matrix-init
+    profiles: [matrix]
+    image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    user: 1001:${DOCKER_GROUP_ID}
+    # The default mastermind env anchor is a YAML sequence, which cannot
+    # be merged with `<<:`. List the inherited vars explicitly and append
+    # the matrix-specific knobs the init script reads.
+    environment:
+      - GLOBAL_SECRET_KEY=${GLOBAL_SECRET_KEY}
+      - POSTGRESQL_HOST=waldur-db
+      - POSTGRESQL_PASSWORD=${POSTGRESQL_PASSWORD}
+      - RABBITMQ_HOST=waldur-queue
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+      - RABBITMQ_USERNAME=${RABBITMQ_USERNAME}
+      - GLOBAL_DEFAULT_FROM_EMAIL=${GLOBAL_DEFAULT_FROM_EMAIL}
+      - SENTRY_DSN=${SENTRY_DSN}
+      - GLOBAL_DEBUG=${GLOBAL_DEBUG}
+      - KEYCLOAK_SECRET=${KEYCLOAK_SECRET}
+      - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT}
+      - WALDUR_DOMAIN=${WALDUR_DOMAIN:-localhost}
+      - WALDUR_MATRIX_BOT_LOCALPART=${WALDUR_MATRIX_BOT_LOCALPART:-waldur-bot}
+      - WALDUR_MATRIX_OPEN_REGISTRATION=${WALDUR_MATRIX_OPEN_REGISTRATION:-false}
+      - WALDUR_MATRIX_RTC_ENABLED=${WALDUR_MATRIX_RTC_ENABLED:-false}
+    # Same set as *default-mastermind-volumes (a YAML sequence anchor
+    # cannot be merged with extra items), plus the matrix bind mount and
+    # the shared secrets volume.
+    volumes:
+      - ${CONFIG_FOLDER}/waldur-mastermind/override.conf.py:/etc/waldur/override.conf.py
+      - ${CONFIG_FOLDER}/waldur-mastermind/logging.conf.py:/etc/waldur/logging.conf.py
+      - ${CONFIG_FOLDER}/waldur-mastermind/saml2.conf.py:/etc/waldur/saml2.conf.py
+      - ${CONFIG_FOLDER}/waldur-mastermind/id_rsa:/etc/waldur/id_rsa
+      - ${CONFIG_FOLDER}/waldur-mastermind/id_rsa.pub:/etc/waldur/id_rsa.pub
+      - ${CONFIG_FOLDER}/waldur-mastermind/saml2/credentials:/etc/waldur/saml2/credentials
+      - ${CONFIG_FOLDER}/waldur-mastermind/saml2/metadata:/etc/waldur/saml2/metadata
+      - ${CONFIG_FOLDER}/waldur-mastermind/valimo:/etc/waldur/valimo
+      - ${CONFIG_FOLDER}/waldur-mastermind/notification-templates.yaml:/etc/waldur/notification-templates.yaml
+      - ${CONFIG_FOLDER}/waldur-mastermind/auth.yaml:/etc/waldur/auth.yaml
+      - ${CONFIG_FOLDER}/waldur-mastermind/support.yaml:/etc/waldur/support.yaml
+      - ${CONFIG_FOLDER}/waldur-mastermind/whitelabeling.yaml:/etc/waldur/whitelabeling.yaml
+      - ${CONFIG_FOLDER}/waldur-mastermind/marketplace.yaml:/etc/waldur/marketplace.yaml
+      - ${CONFIG_FOLDER}/waldur-mastermind/marketplace-script.yaml:/etc/waldur/marketplace-script.yaml
+      - ${CONFIG_FOLDER}/whitelabeling:/etc/waldur/icons
+      - waldur_script_launchzone:/var/lib/waldur/waldur-script-launchzone
+      - ${CONFIG_FOLDER}/matrix:/etc/waldur/matrix:ro
+      - waldur_matrix_secrets:/var/lib/waldur/matrix
+    depends_on:
+      waldur-db:
+        condition: service_healthy
+      waldur-mastermind-db-migration:
+        condition: service_completed_successfully
+      waldur-launchzone-init-volume:
+        condition: service_completed_successfully
+      waldur-matrix-init-volume:
+        condition: service_completed_successfully
+    command: ["/etc/waldur/matrix/init-matrix.sh"]
+    restart: "no"
+
+  tuwunel:
+    container_name: tuwunel
+    profiles: [matrix]
+    image: 'ghcr.io/matrix-construct/tuwunel:${WALDUR_TUWUNEL_IMAGE_TAG:-v1.7.1}'
+    restart: always
+    environment:
+      TUWUNEL_CONFIG: /etc/waldur/matrix/tuwunel.toml
+    volumes:
+      - tuwunel_data:/var/lib/tuwunel
+      - waldur_matrix_secrets:/etc/waldur/matrix:ro
+    # `tuwunel.internal` is the dotted alias that mastermind uses as the
+    # MATRIX_HOMESERVER_URL host — single-word service names fail Django's
+    # URLValidator. Both names resolve to the same container.
+    networks:
+      default:
+        aliases:
+          - tuwunel.internal
+    depends_on:
+      waldur-matrix-init:
+        condition: service_completed_successfully
+    # Disable IPv6 in this netns. lk-jwt-service (matrix-rtc profile) shares
+    # this namespace via `network_mode: service:tuwunel`; its Go dialer
+    # honours RFC 6724 and would otherwise try [::1] first.
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=1
+    # Tuwunel ships as a distroless image — no shell, no curl/wget — so we
+    # rely on `restart: always` and verify reachability through Caddy
+    # (curl https://${WALDUR_DOMAIN}/_matrix/client/versions) instead of
+    # an in-container healthcheck.
+
+  livekit:
+    container_name: livekit
+    profiles: [matrix-rtc]
+    image: 'livekit/livekit-server:${WALDUR_LIVEKIT_IMAGE_TAG:-v1.12.0}'
+    restart: always
+    ports:
+      - '${WALDUR_MATRIX_RTC_TCP_PORT:-7881}:7881/tcp'
+      - '${WALDUR_MATRIX_RTC_UDP_PORT:-7882}:7882/udp'
+    environment:
+      LIVEKIT_CONFIG: |
+        port: 7880
+        bind_addresses: [""]
+        rtc:
+          tcp_port: 7881
+          udp_port: 7882
+          use_external_ip: false
+          node_ip: ${WALDUR_LIVEKIT_NODE_IP:-127.0.0.1}
+        keys:
+          ${WALDUR_LIVEKIT_KEY:-devkey}: ${WALDUR_LIVEKIT_SECRET:-devsecret}
+
+  lk-jwt-service:
+    container_name: lk-jwt-service
+    profiles: [matrix-rtc]
+    image: 'ghcr.io/element-hq/lk-jwt-service:${WALDUR_LK_JWT_IMAGE_TAG:-0.5.0}'
+    restart: always
+    # Share tuwunel's netns so federation discovery resolves "localhost"
+    # back to the homeserver (same trick as docker/matrix-dev/).
+    network_mode: "service:tuwunel"
+    depends_on:
+      - tuwunel
+      - livekit
+    environment:
+      LIVEKIT_URL: ws://livekit:7880
+      LIVEKIT_KEY: ${WALDUR_LIVEKIT_KEY:-devkey}
+      LIVEKIT_SECRET: ${WALDUR_LIVEKIT_SECRET:-devsecret}
+      LIVEKIT_FULL_ACCESS_HOMESERVERS: ${WALDUR_DOMAIN:-localhost}
+      # Accept Caddy's self-signed cert when TLS=internal. Set to "" or
+      # remove for deployments terminating TLS with a trusted certificate.
+      LIVEKIT_INSECURE_SKIP_VERIFY_TLS: YES_I_KNOW_WHAT_I_AM_DOING
+
   logger:
     image: '${DOCKER_REGISTRY_PREFIX}umputun/docker-logger:v1.3.0'
     container_name: "logger"
@@ -296,6 +442,8 @@ volumes:
   caddy_config:
   keycloak_db:
   waldur_script_launchzone:
+  tuwunel_data:
+  waldur_matrix_secrets:
 
 networks:
   default:
