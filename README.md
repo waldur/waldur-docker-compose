@@ -286,7 +286,7 @@ http://keycloak:8080/auth/realms/<YOUR REALM>/.well-known/openid-configuration
 
 ## Matrix chat add-on
 
-Two optional Compose profiles bring up a self-contained Matrix homeserver alongside Waldur — `matrix` for chat and `matrix-rtc` for Element Call voice/video. Activation, the one-time appservice registration, troubleshooting, and the rest of the operator guide live in [docs/matrix-chat-add-on.md](docs/matrix-chat-add-on.md).
+Two optional Compose profiles bring up a self-contained Matrix homeserver alongside Waldur — `matrix` for chat and `matrix-rtc` for Element Call voice/video. Activation, the one-time appservice registration, troubleshooting, and the rest of the operator guide live in `docs/matrix-chat-add-on.md` in this repo, and on the Waldur docs site under the docker-compose deployment guide.
 
 ## Integration with SLURM
 
