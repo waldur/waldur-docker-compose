@@ -1,0 +1,36 @@
+[global]
+
+server_name = "@@SERVER_NAME@@"
+
+database_path = "/var/lib/tuwunel"
+
+address = ["0.0.0.0"]
+port = [6167]
+
+# Open registration is OFF by default for the docker-compose profile.
+# Operators can register users via the registration_token below or via the
+# Synapse-compatible /_synapse/admin/v1/register endpoint (HMAC keyed by
+# registration_shared_secret).
+allow_registration = @@OPEN_REGISTRATION@@
+yes_i_am_very_very_sure_i_want_an_open_registration_server_prone_to_abuse = @@OPEN_REGISTRATION@@
+
+registration_token = "@@REG_TOKEN@@"
+
+# Synapse-compatible shared-secret register endpoint (Tuwunel 1.7.0+).
+# Lets Waldur and operators provision users via POST
+# /_synapse/admin/v1/register with HMAC-SHA1 of the returned nonce keyed
+# by this secret.
+registration_shared_secret = "@@REG_TOKEN@@"
+
+max_request_size = 104857600
+
+# Federation must be ON for lk-jwt-service to verify Matrix OpenID tokens
+# via /_matrix/federation/v1/openid/userinfo (used during Element Call
+# token exchange). Disabling federation breaks Element Call.
+allow_federation = true
+
+[global.well_known]
+client = "https://@@SERVER_NAME@@"
+server = "@@SERVER_NAME@@:443"
+
+@@RTC_BLOCK@@

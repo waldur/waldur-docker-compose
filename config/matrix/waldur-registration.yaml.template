@@ -1,0 +1,13 @@
+as_token: @@AS_TOKEN@@
+hs_token: @@HS_TOKEN@@
+id: waldur
+namespaces:
+  aliases: []
+  rooms: []
+  users:
+  - exclusive: true
+    regex: '@@@LOCALPART@@:@@SERVER_NAME@@'
+  - exclusive: false
+    regex: '@.*:@@SERVER_NAME@@'
+sender_localpart: @@LOCALPART@@
+url: http://waldur-mastermind-api:8080

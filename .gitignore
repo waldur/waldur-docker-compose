@@ -4,3 +4,4 @@ pgsql
 waldur_libs
 waldur_logs
 .env
+.matrix-screenshots/
