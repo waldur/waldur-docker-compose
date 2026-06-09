@@ -125,6 +125,13 @@ services:
         condition: service_started
       waldur-launchzone-init-volume:
         condition: service_completed_successfully
+      # `required: false` keeps this no-op when the matrix profile is
+      # inactive (tuwunel is undefined). When matrix is active, the
+      # worker waits for tuwunel's container so docker DNS resolves
+      # tuwunel.internal before any background Matrix tasks fire.
+      tuwunel:
+        condition: service_started
+        required: false
     healthcheck:
       test: ["CMD-SHELL", "celery -A waldur_core.server inspect ping"]
       interval: 30s
@@ -148,6 +155,9 @@ services:
         condition: service_started
       waldur-launchzone-init-volume:
         condition: service_completed_successfully
+      tuwunel:
+        condition: service_started
+        required: false
     command: beat
     restart: always
     extra_hosts: *default-mastermind-hosts
@@ -170,6 +180,9 @@ services:
         condition: service_started
       waldur-launchzone-init-volume:
         condition: service_completed_successfully
+      tuwunel:
+        condition: service_started
+        required: false
     command: mastermind
     restart: always
     extra_hosts: *default-mastermind-hosts
