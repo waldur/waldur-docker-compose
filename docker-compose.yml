@@ -419,7 +419,11 @@ services:
       - tuwunel
       - livekit
     environment:
-      LIVEKIT_URL: ws://livekit:7880
+      # URL returned to browsers in the JWT response. Must be reachable
+      # from the public internet — LiveKit's signaling port (7880) is
+      # not exposed on the host, so we tunnel WSS through Caddy. Media
+      # still flows on the RTC ports below.
+      LIVEKIT_URL: wss://${WALDUR_DOMAIN:-localhost}/livekit
       LIVEKIT_KEY: ${WALDUR_LIVEKIT_KEY:-devkey}
       LIVEKIT_SECRET: ${WALDUR_LIVEKIT_SECRET:-devsecret}
       LIVEKIT_FULL_ACCESS_HOMESERVERS: ${WALDUR_DOMAIN:-localhost}
