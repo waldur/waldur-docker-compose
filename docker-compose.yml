@@ -395,9 +395,11 @@ services:
     ports:
       - '${WALDUR_MATRIX_RTC_TCP_PORT:-7881}:7881/tcp'
       - '${WALDUR_MATRIX_RTC_UDP_PORT:-7882}:7882/udp'
-      # TURNS relay. Only bound when WALDUR_MATRIX_TURN_ENABLED=true; otherwise
-      # the mapping points at a port livekit never listens on (refused, harmless).
-      - '${WALDUR_MATRIX_RTC_TLS_PORT:-5349}:5349/tcp'
+      # TURN/UDP relay. LiveKit advertises the relay to clients on udp_port, so
+      # it must be 443. Only listened on when WALDUR_MATRIX_TURN_ENABLED=true;
+      # otherwise packets are dropped (harmless). 443/udp is free on a single
+      # host — Caddy only binds 443/tcp.
+      - '${WALDUR_MATRIX_TURN_UDP_PORT:-443}:443/udp'
     environment:
       LIVEKIT_CONFIG: |
         port: 7880
@@ -409,22 +411,16 @@ services:
           node_ip: ${WALDUR_LIVEKIT_NODE_IP:-127.0.0.1}
         keys:
           ${WALDUR_LIVEKIT_KEY:-devkey}: ${WALDUR_LIVEKIT_SECRET:-devsecret}
-        # Embedded TURNS relay for clients behind symmetric NAT / restrictive
-        # firewalls where direct media to node_ip fails. Unlike helm 
-        # there is no separate LoadBalancer IP, so the relay
-        # is just WALDUR_DOMAIN:5349 — no extra DNS record.
+        # Embedded TURN/UDP relay for clients behind symmetric NAT where direct
+        # media to node_ip fails. UDP-only on 443: needs no cert (unlike TURN/TLS),
+        # and LiveKit advertises the relay to clients on udp_port — which must be
+        # 443, the firewall-friendly port that is free on the host (Caddy holds
+        # 443/tcp, not 443/udp). Does not help clients that block all outbound
+        # UDP; that needs TURN/TLS on a dedicated IP (the helm topology).
         turn:
           enabled: ${WALDUR_MATRIX_TURN_ENABLED:-false}
           domain: ${WALDUR_DOMAIN:-localhost}
-          tls_port: 5349
-          cert_file: /etc/livekit-turn/tls.crt
-          key_file: /etc/livekit-turn/tls.key
-    volumes:
-      # TURNS cert/key for ${WALDUR_DOMAIN}. The stack stays generic about how it
-      # gets here: the deployment drops a browser-trusted pair (e.g. a post-deploy
-      # step that copies the cert Caddy already manages). Read only when
-      # turn.enabled=true; may be empty when TURN is off.
-      - ${CONFIG_FOLDER}/matrix-turn:/etc/livekit-turn:ro
+          udp_port: 443
 
   lk-jwt-service:
     container_name: lk-jwt-service
