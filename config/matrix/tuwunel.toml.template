@@ -7,19 +7,22 @@ database_path = "/var/lib/tuwunel"
 address = ["0.0.0.0"]
 port = [6167]
 
-# Open registration is OFF by default for the docker-compose profile.
-# Operators can register users via the registration_token below or via the
-# Synapse-compatible /_synapse/admin/v1/register endpoint (HMAC keyed by
-# registration_shared_secret).
-allow_registration = @@OPEN_REGISTRATION@@
+# Registration is ENABLED but gated by registration_token below — a random user
+# cannot self-register without it. Waldur provisions users through that token
+# (the m.login.registration_token flow), which is also the only path that sets a
+# usable password on Tuwunel, so this must stay true for password login to work.
+#
+# WALDUR_MATRIX_OPEN_REGISTRATION drops the token requirement entirely (the flag
+# below), making the server openly abusable. Keep it false unless you mean it.
+allow_registration = true
 yes_i_am_very_very_sure_i_want_an_open_registration_server_prone_to_abuse = @@OPEN_REGISTRATION@@
 
 registration_token = "@@REG_TOKEN@@"
 
-# Synapse-compatible shared-secret register endpoint (Tuwunel 1.7.0+).
-# Lets Waldur and operators provision users via POST
-# /_synapse/admin/v1/register with HMAC-SHA1 of the returned nonce keyed
-# by this secret.
+# Synapse-compatible shared-secret register endpoint (Tuwunel 1.7.0+). Waldur
+# does NOT use this (it provisions via the registration_token flow above); left
+# available for operators who want to register users via POST
+# /_synapse/admin/v1/register with HMAC-SHA1 of the returned nonce keyed by it.
 registration_shared_secret = "@@REG_TOKEN@@"
 
 max_request_size = 104857600
