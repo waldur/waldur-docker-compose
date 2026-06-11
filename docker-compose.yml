@@ -395,6 +395,9 @@ services:
     ports:
       - '${WALDUR_MATRIX_RTC_TCP_PORT:-7881}:7881/tcp'
       - '${WALDUR_MATRIX_RTC_UDP_PORT:-7882}:7882/udp'
+      # TURNS relay. Only bound when WALDUR_MATRIX_TURN_ENABLED=true; otherwise
+      # the mapping points at a port livekit never listens on (refused, harmless).
+      - '${WALDUR_MATRIX_RTC_TLS_PORT:-5349}:5349/tcp'
     environment:
       LIVEKIT_CONFIG: |
         port: 7880
@@ -406,6 +409,22 @@ services:
           node_ip: ${WALDUR_LIVEKIT_NODE_IP:-127.0.0.1}
         keys:
           ${WALDUR_LIVEKIT_KEY:-devkey}: ${WALDUR_LIVEKIT_SECRET:-devsecret}
+        # Embedded TURNS relay for clients behind symmetric NAT / restrictive
+        # firewalls where direct media to node_ip fails. Unlike helm 
+        # there is no separate LoadBalancer IP, so the relay
+        # is just WALDUR_DOMAIN:5349 — no extra DNS record.
+        turn:
+          enabled: ${WALDUR_MATRIX_TURN_ENABLED:-false}
+          domain: ${WALDUR_DOMAIN:-localhost}
+          tls_port: 5349
+          cert_file: /etc/livekit-turn/tls.crt
+          key_file: /etc/livekit-turn/tls.key
+    volumes:
+      # TURNS cert/key for ${WALDUR_DOMAIN}. The stack stays generic about how it
+      # gets here: the deployment drops a browser-trusted pair (e.g. a post-deploy
+      # step that copies the cert Caddy already manages). Read only when
+      # turn.enabled=true; may be empty when TURN is off.
+      - ${CONFIG_FOLDER}/matrix-turn:/etc/livekit-turn:ro
 
   lk-jwt-service:
     container_name: lk-jwt-service
