@@ -105,34 +105,20 @@ On re-up, `waldur-matrix-init` generates fresh tokens, re-renders the descriptor
 
 ### TURN relay (symmetric NAT / iCloud Private Relay)
 
-Direct media to `WALDUR_LIVEKIT_NODE_IP` fails for clients behind symmetric NAT or proxies that don't carry WebRTC UDP. Enabling TURN gives LiveKit a TLS relay those clients can fall back to.
+Direct media to `WALDUR_LIVEKIT_NODE_IP` fails for clients behind symmetric NAT or proxies that don't carry WebRTC UDP. Enabling TURN gives LiveKit a relay those clients fall back to.
 
-Set `WALDUR_MATRIX_TURN_ENABLED=true` (within `--profile matrix-rtc`). Because the stack is single-host, the relay lives at `WALDUR_DOMAIN:5349` — the same IP that already serves the web UI and media ports, so **no extra DNS record is needed**.
+Set `WALDUR_MATRIX_TURN_ENABLED=true` (within `--profile matrix-rtc`). The stack uses **TURN/UDP on port 443** — `udp_port` is the port LiveKit advertises to clients, and 443 is the firewall-friendly choice. Because the stack is single-host, the relay lives at `WALDUR_DOMAIN:443/udp` — the same IP that already serves the web UI, so **no extra DNS record is needed**.
 
-LiveKit terminates the TURNS TLS itself (stock Caddy is HTTP-only and can't proxy the TURN protocol), so it needs a cert/key for `WALDUR_DOMAIN` at `${CONFIG_FOLDER}/matrix-turn/tls.crt` + `tls.key`. The cert **must be browser-trusted** — `TLS=internal` (self-signed) will not work, because the browser validates the relay's cert and silently drops it. Use `TLS=<email>` (Let's Encrypt) or `TLS=custom`.
+This mode needs **no certificate**: TURN/UDP isn't TLS, so there is nothing to provision or renew. It also doesn't collide with Caddy — Caddy binds `443/tcp` (HTTPS) while TURN takes `443/udp`, which is otherwise free on the host.
 
-The stack stays generic about how the cert lands in `matrix-turn/` — it just reads it. The deployment owns that step, because the cert it needs is the one Caddy already manages. The recommended pattern is a **post-deploy step that reuses Caddy's cert** (Caddy and livekit both run as root, so it can read Caddy's `0600` keys):
-
-```bash
-# Locate Caddy's managed cert by filename (the issuer subdir — Let's Encrypt vs
-# ZeroSSL — is not deterministic) and copy it where LiveKit reads it.
-CRT=$(docker run --rm -v waldur-docker-compose_caddy_data:/d alpine \
-  find /d/caddy/certificates -name "${WALDUR_DOMAIN}.crt" | head -n1)
-docker run --rm -v waldur-docker-compose_caddy_data:/d \
-  -v "$(pwd)/config/matrix-turn":/turn alpine \
-  sh -c "cp '$CRT' /turn/tls.crt && cp '${CRT%.crt}.key' /turn/tls.key"
-docker compose up -d --force-recreate livekit   # livekit reads the cert at boot only
-```
-
-Run this *after* Caddy is serving (so the cert exists) and re-run it after each renewal — restarting livekit is what makes it pick up the new cert. On a deployment that redeploys on a schedule (e.g. the `demo-environments` daily pipeline runs `bootstrap-matrix.sh`), drop this into that script and renewal is handled automatically. For `TLS=custom`, copy the same pair you already provide to Caddy instead.
-
-Verify the relay is up:
+Open **`443/udp`** on any upstream firewall / cloud security group (the same way `443/tcp` is already opened for the web UI).
 
 ```bash
-openssl s_client -connect ${WALDUR_DOMAIN}:5349 -servername ${WALDUR_DOMAIN} </dev/null 2>/dev/null \
-  | openssl x509 -noout -subject -dates
-# subject CN must match WALDUR_DOMAIN and the cert must be unexpired
+# Confirm livekit is listening on 443/udp inside the container
+docker compose exec livekit sh -c 'ss -lun | grep :443 || netstat -lun | grep :443'
 ```
+
+Coverage note: TURN/UDP rescues symmetric-NAT clients and any network that permits outbound UDP on 443. It does **not** help clients on networks that block all outbound UDP (strict corporate firewalls) — that requires TURN/TLS on TCP 443, which on a single host means giving LiveKit its own IP or a layer-4 load balancer (the helm topology). For a single-host compose deployment, TURN/UDP is the pragmatic option.
 
 ## Apple Silicon
 
