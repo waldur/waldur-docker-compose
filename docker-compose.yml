@@ -11,6 +11,9 @@ x-mastermind-environment:
   - GLOBAL_DEBUG=${GLOBAL_DEBUG}
   - KEYCLOAK_SECRET=${KEYCLOAK_SECRET}
   - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT}
+  # Memory tuning. Defaults match the image; override in .env to retune.
+  - GUNICORN_PRELOAD=${GUNICORN_PRELOAD:-true}
+  - CELERY_WORKER_MAX_MEMORY_PER_CHILD=${CELERY_WORKER_MAX_MEMORY_PER_CHILD:-}
 
 x-mastermind-volumes:
   &default-mastermind-volumes
