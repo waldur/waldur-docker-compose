@@ -24,6 +24,23 @@
 {$VIRTUAL_HOST} {
 	tls {$TLS}
 
+	# Compress proxied responses at the serving layer. API JSON (e.g.
+	# /api/roles/) is dominated by repeated permission-enum strings and
+	# shrinks ~85% under compression; homeport static assets benefit too.
+	# Caddy negotiates via Accept-Encoding and sets Vary accordingly.
+	# Restrict to compressible content types so we don't waste CPU
+	# re-compressing already-compressed /media/ uploads (JPEG/PNG/PDF/zip).
+	encode zstd gzip {
+		match {
+			header Content-Type text/*
+			header Content-Type application/json*
+			header Content-Type application/*+json*
+			header Content-Type application/javascript*
+			header Content-Type application/xml*
+			header Content-Type image/svg+xml*
+		}
+	}
+
 	handle_errors {
 		header {
 			Access-Control-Allow-Origin "{header.origin}"
