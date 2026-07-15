@@ -1,5 +1,7 @@
 include:
   - project: "waldur/waldur-pipelines"
+    file: "/templates/release/tag-release.yml"
+  - project: "waldur/waldur-pipelines"
     file: "/templates/stages.yml"
   - project: "waldur/waldur-pipelines"
     file: "/templates/test/check-merge-compatibility.yml"
@@ -77,3 +79,13 @@ Trigger dev env update:
       when: never
     - if: $CI_COMMIT_TAG
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
+Release tag:
+  extends: .release-tag-base
+  script:
+    - sed -i -E -e "s/^WALDUR_MASTERMIND_IMAGE_TAG=('.*'|.*)$/WALDUR_MASTERMIND_IMAGE_TAG=$RELEASE_VERSION/" .env.example
+    - sed -i -E -e "s/^WALDUR_HOMEPORT_IMAGE_TAG=('.*'|.*)$/WALDUR_HOMEPORT_IMAGE_TAG=$RELEASE_VERSION/" .env.example
+    - git add .env.example
+    - git diff --cached --quiet && echo "waldur-docker-compose versions already updated" || (git commit -m "Set target version to ${RELEASE_VERSION}" && git push -o "ci.skip" origin HEAD)
+    - git tag -a $RELEASE_VERSION -m "Release $RELEASE_VERSION" || echo "Tag already exists"
+    - git push origin $RELEASE_VERSION || echo "Tag already pushed"
