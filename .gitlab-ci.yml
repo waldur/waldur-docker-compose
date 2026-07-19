@@ -19,6 +19,13 @@ Test compose configuration:
       command: ["--mtu=1400"]
   interruptible: true
   rules:
+    # Skip during release orchestration: the release only bumps and tags. Image
+    # integration is covered by develop/MR/schedule runs and single-component
+    # (mastermind/homeport) triggers. waldur-docs runs the image releases in an
+    # earlier stage than the docker-compose release, so the tags are guaranteed
+    # to exist by tag time.
+    - if: '$CI_PIPELINE_SOURCE == "pipeline" && $RELEASE_VERSION'
+      when: never
     # If triggered from another pipeline
     - if: $TRIGGER_PROJECT_NAME
     # If changes are pushed to `develop` or `master` branch
