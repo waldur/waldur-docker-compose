@@ -1,10 +1,11 @@
 x-mastermind-environment:
   &default-mastermind-env
   - GLOBAL_SECRET_KEY=${GLOBAL_SECRET_KEY}
-  # Fernet key for encrypting secret DB columns (e.g. resource API keys), plus
-  # the previous keys that must stay decryptable while it is rotated. Both are
-  # optional; unset means the key is derived from GLOBAL_SECRET_KEY. See
-  # .env.example for how to generate and rotate them.
+  # Fernet key for encrypting secret DB columns at rest — resource API keys,
+  # service settings credentials, offering secret options — plus the previous
+  # keys that must stay decryptable while it is rotated. Both are optional;
+  # unset means the key is derived from GLOBAL_SECRET_KEY. See .env.example for
+  # how to generate and rotate them.
   - FIELD_ENCRYPTION_KEY=${FIELD_ENCRYPTION_KEY:-}
   - FIELD_ENCRYPTION_KEY_FALLBACKS=${FIELD_ENCRYPTION_KEY_FALLBACKS:-}
   - POSTGRESQL_HOST=waldur-db
