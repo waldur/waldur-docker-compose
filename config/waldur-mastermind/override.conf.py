@@ -32,3 +32,25 @@ RABBITMQ = {
     "PASSWORD": RABBITMQ_PASSWORD,
     "MANAGEMENT_PORT": 15672,
 }
+
+# Outgoing email.
+#
+# The mastermind image ships an override.conf.py whose only content is a
+# placeholder EMAIL_HOST; this file is mounted over it, so the SMTP settings
+# have to be re-established here. They are read from the environment so that
+# credentials stay in .env rather than in a file baked into the repository.
+#
+# Everything stays unset unless EMAIL_HOST is provided, which keeps Django's
+# own defaults in place for stacks that do not send mail (demos, CI).
+email_host = os.environ.get('EMAIL_HOST', '')
+if email_host:
+    EMAIL_HOST = email_host
+    EMAIL_PORT = int(os.environ.get('EMAIL_PORT') or 25)
+    EMAIL_HOST_USER = os.environ.get('EMAIL_USER', '')
+    EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_PASSWORD', '')
+    # STARTTLS (typically port 587) and implicit TLS (typically port 465) are
+    # mutually exclusive; Django raises at send time if both are enabled.
+    EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'false').lower() == 'true'
+    EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'false').lower() == 'true'
+    # Without a timeout a stalled relay blocks a Celery worker indefinitely.
+    EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT') or 30)
