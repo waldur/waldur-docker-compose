@@ -68,6 +68,25 @@ docker compose down
 docker compose up -d
 ```
 
+### Config folder changes
+
+Every file under `${CONFIG_FOLDER}/waldur-mastermind` listed in
+`docker-compose.yml` is a **file** bind mount. If the source is missing on the
+host, Docker silently creates a *directory* in its place and the startup command
+that reads it fails with `IsADirectoryError`. `initdb` runs under `set -e`, so
+the stack does not come up.
+
+With the default `CONFIG_FOLDER=./config/` this cannot happen — the files arrive
+with the repository. If `CONFIG_FOLDER` points at a directory of your own, diff
+it against `config/waldur-mastermind/` after pulling a release and copy over
+anything new.
+
+Recently added or renamed:
+
+- `notifications-templates.yaml` — renamed from `notification-templates.yaml`.
+  The old name never took effect: `initdb` reads the plural form.
+- `notifications.json` — added. Must exist even if empty (`{}`).
+
 ## Upgrade Instructions for PostgreSQL Images
 
 ### Automated Upgrade (Recommended)
@@ -230,6 +249,73 @@ docker exec -it keycloak-db pg_dumpall -U keycloak > /path/to/backup/keycloak_up
     docker logs waldur-db
     docker logs keycloak-db
     ```
+
+## Outgoing email
+
+Two independent things must be configured before Waldur sends anything. Each is
+necessary and neither is sufficient:
+
+1. **An SMTP relay.** The stack ships none, and the mastermind image's own
+   placeholder is overwritten by the mounted `override.conf.py`.
+2. **Enabled notifications.** Every notification type ships disabled.
+
+A correct relay with no notifications enabled sends nothing at all, and logs
+nothing to explain it.
+
+### SMTP relay
+
+Set the relay in `.env`; `config/waldur-mastermind/override.conf.py` reads these
+and leaves Django's defaults untouched when `EMAIL_HOST` is empty:
+
+```sh
+GLOBAL_DEFAULT_FROM_EMAIL=waldur@example.com
+GLOBAL_DEFAULT_REPLY_TO_EMAIL=support@example.com
+EMAIL_HOST=smtp.example.com
+EMAIL_PORT=587
+EMAIL_USER=waldur@example.com
+EMAIL_PASSWORD=s3cret
+EMAIL_USE_TLS=true
+```
+
+Use `EMAIL_USE_TLS` with port 587 (STARTTLS) or `EMAIL_USE_SSL` with port 465
+(implicit TLS) — never both, or Django raises at send time. Leave `EMAIL_USER`
+and `EMAIL_PASSWORD` empty for a relay that accepts unauthenticated mail.
+
+### Enabling notifications
+
+List the notification types to enable in
+`config/waldur-mastermind/notifications.json`, which is mounted into the
+containers and loaded on startup:
+
+```json
+{
+    "users.invitation_created": true,
+    "users.invitation_approved": true,
+    "marketplace.notification_usages": true
+}
+```
+
+Keys not listed keep their current value. The same toggles are available at
+runtime under **Administration → Notifications** in the UI.
+
+To customise the message bodies, put the replacement templates in
+`config/waldur-mastermind/notifications-templates.yaml`.
+
+### Verifying
+
+```sh
+docker exec -it waldur-mastermind-api waldur sendtestemail you@example.org
+```
+
+This bypasses the notification system, so it isolates the relay. It does not
+show up under **Support → Email logs**: that log is written by Waldur's own send
+path, and only after the relay has accepted a message. An empty log with SMTP
+errors in the worker logs points at the relay; an empty log with silent workers
+means nothing was generated, so check the notifications above.
+
+Full reference: [Email configuration][email-docs] in the admin guide.
+
+[email-docs]: https://docs.waldur.com/latest/admin-guide/mastermind-configuration/email/
 
 ## Using TLS
 
