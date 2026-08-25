@@ -84,7 +84,7 @@ services:
   # RabbitMQ
   waldur-queue:
     container_name: waldur-queue
-    image: '${DOCKER_REGISTRY_PREFIX}library/rabbitmq:4.1.2'
+    image: '${DOCKER_REGISTRY_PREFIX}library/rabbitmq:4.3.5'
     environment:
       - RABBITMQ_DEFAULT_USER=${RABBITMQ_USERNAME}
       - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}

@@ -32,7 +32,7 @@ The 14 services in `docker-compose.yml`:
 | Service | Image (`${DOCKER_REGISTRY_PREFIX}` prefix) | Purpose |
 |---|---|---|
 | `waldur-db` | `library/postgres:${WALDUR_POSTGRES_IMAGE_TAG}` | Mastermind primary DB |
-| `waldur-queue` | `library/rabbitmq:4.1.2` | Celery broker |
+| `waldur-queue` | `library/rabbitmq:4.3.5` | Celery broker |
 | `waldur-launchzone-init-volume` | mastermind | One-shot init: ensures shared volume layout |
 | `waldur-mastermind-db-migration` | mastermind | Runs migrations once, exits 0 |
 | `waldur-mastermind-whitelabeling-init` | mastermind | Loads whitelabeling config |
