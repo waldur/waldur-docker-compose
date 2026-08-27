@@ -22,6 +22,15 @@ CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
         'LOCATION': 'waldur_cache',
+        'OPTIONS': {
+            # Django's own default is 300 rows, which is far too small: this
+            # table holds the brute-force login lockout counters, the
+            # blocked-user event dedup keys and the whole DRF throttle history,
+            # and a third of it is deleted whenever it overflows. Left at the
+            # default, those counters are evicted long before they expire and
+            # the limits they implement quietly stop applying.
+            'MAX_ENTRIES': 100000,
+        },
     }
 }
 
