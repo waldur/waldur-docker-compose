@@ -63,3 +63,40 @@ if email_host:
     EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'false').lower() == 'true'
     # Without a timeout a stalled relay blocks a Celery worker indefinitely.
     EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT') or 30)
+
+
+# Native passkey (FIDO2/WebAuthn) support. Off unless WALDUR_PASSKEY_METHODS
+# names at least one flow, so an existing deployment is unaffected.
+#
+#   WALDUR_PASSKEY_METHODS=PASSKEY_MFA              second factor after password
+#   WALDUR_PASSKEY_METHODS=PASSKEY_SIGNIN           passwordless sign-in
+#   WALDUR_PASSKEY_METHODS=PASSKEY_SIGNIN,PASSKEY_MFA  both
+passkey_methods = [
+    method.strip()
+    for method in os.environ.get('WALDUR_PASSKEY_METHODS', '').split(',')
+    if method.strip()
+]
+if passkey_methods:
+    WALDUR_CORE['AUTHENTICATION_METHODS'] = (
+        WALDUR_CORE['AUTHENTICATION_METHODS'] + passkey_methods
+    )
+    passkey_domain = os.environ.get('WALDUR_DOMAIN', 'localhost')
+    # Caddy terminates TLS and serves the portal and the API on this one
+    # origin, so both derive from the same value. Browsers expose WebAuthn
+    # only in a secure context, which is why the origin is https even for
+    # localhost, where Caddy uses its internal CA.
+    #
+    # CHANGING THE RP ID ORPHANS EVERY REGISTERED CREDENTIAL: a passkey is
+    # bound to the domain it was created under, and after a change the browser
+    # will not offer it. Waldur logs a startup warning counting the affected
+    # credentials, but every user has to enrol again.
+    WALDUR_CORE['PASSKEY_RP_ID'] = (
+        os.environ.get('WALDUR_PASSKEY_RP_ID') or passkey_domain
+    )
+    passkey_origins = os.environ.get('WALDUR_PASSKEY_ALLOWED_ORIGINS', '')
+    WALDUR_CORE['PASSKEY_ALLOWED_ORIGINS'] = [
+        origin.strip() for origin in passkey_origins.split(',') if origin.strip()
+    ] or [f'https://{passkey_domain}']
+    passkey_rp_name = os.environ.get('WALDUR_PASSKEY_RP_NAME', '')
+    if passkey_rp_name:
+        WALDUR_CORE['PASSKEY_RP_NAME'] = passkey_rp_name
