@@ -100,3 +100,17 @@ if passkey_methods:
     passkey_rp_name = os.environ.get('WALDUR_PASSKEY_RP_NAME', '')
     if passkey_rp_name:
         WALDUR_CORE['PASSKEY_RP_NAME'] = passkey_rp_name
+    # Require staff and support accounts to hold a passkey and to have
+    # satisfied it for the current session.
+    #
+    # ENABLING THIS LOGS EVERY STAFF MEMBER OUT: tokens issued before the
+    # switch were created without a passkey, so leaving them would mean the
+    # setting changed nothing until each expired. Run
+    # "waldur revoke_unverified_staff_tokens" as part of the rollout.
+    #
+    # Nested inside the passkey block on purpose — enforcement without a
+    # passkey method would leave staff no way to comply.
+    WALDUR_CORE['PASSKEY_ENFORCED_FOR_STAFF'] = (
+        os.environ.get('WALDUR_PASSKEY_ENFORCED_FOR_STAFF', 'false').lower()
+        == 'true'
+    )
