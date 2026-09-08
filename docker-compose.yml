@@ -31,6 +31,7 @@ x-mastermind-environment:
   # Memory tuning. Defaults match the image; override in .env to retune.
   - GUNICORN_PRELOAD=${GUNICORN_PRELOAD:-true}
   - CELERY_WORKER_MAX_MEMORY_PER_CHILD=${CELERY_WORKER_MAX_MEMORY_PER_CHILD:-}
+  - CELERYD_CONCURRENCY=${CELERYD_CONCURRENCY:-10}
 
 x-mastermind-volumes:
   &default-mastermind-volumes
