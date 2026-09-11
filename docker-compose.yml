@@ -383,7 +383,7 @@ services:
   tuwunel:
     container_name: tuwunel
     profiles: [matrix]
-    image: 'ghcr.io/matrix-construct/tuwunel:${WALDUR_TUWUNEL_IMAGE_TAG:-v1.7.1}'
+    image: 'ghcr.io/matrix-construct/tuwunel:${WALDUR_TUWUNEL_IMAGE_TAG:-v1.9.0}'
     restart: always
     environment:
       TUWUNEL_CONFIG: /etc/waldur/matrix/tuwunel.toml

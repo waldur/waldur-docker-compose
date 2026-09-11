@@ -26,11 +26,39 @@ Matrix component versions live in `.env`. Bump them deliberately:
 
 | Variable | Default | Component |
 |---|---|---|
-| `WALDUR_TUWUNEL_IMAGE_TAG` | `v1.7.1` | Tuwunel homeserver — requires 1.7.0+ for Synapse-compatible `registration_shared_secret` |
+| `WALDUR_TUWUNEL_IMAGE_TAG` | `v1.9.0` | Tuwunel homeserver — requires 1.7.0+ for Synapse-compatible `registration_shared_secret`. **Kept in lockstep with the Helm chart's `matrixChat.homeserver.imageTag`** — one supported homeserver version across both packaging paths |
 | `WALDUR_LIVEKIT_IMAGE_TAG` | `v1.12.0` | LiveKit SFU |
 | `WALDUR_LK_JWT_IMAGE_TAG` | `0.5.0` | lk-jwt-service — requires explicit `LIVEKIT_FULL_ACCESS_HOMESERVERS` (auto-set) |
 
 All three publish multi-arch (`linux/amd64` and `linux/arm64`) manifests for the pinned tags. Re-check with `docker buildx imagetools inspect <image>:<tag>` after bumps.
+
+**Back up before bumping Tuwunel.** It migrates its embedded database in place
+on the first boot of a new version, before it listens and without logging
+anything, so read the
+[upstream release notes](https://github.com/matrix-construct/tuwunel/releases)
+before moving in either direction. A `tuwunel` container that is up but not
+answering `/_matrix/client/versions` is migrating, not hung: do not restart it,
+a restart mid-migration corrupts the database.
+
+**Downgrades are the dangerous direction.** An older Tuwunel boots cleanly on a
+migrated database and then silently serves stale data from the old stores. Stop
+the stack and back up the `tuwunel_data` volume before changing the tag;
+restoring that backup is the only rollback. The Helm chart's
+[Matrix chat guide](https://docs.waldur.com/latest/admin-guide/deployment/helm/docs/matrix-chat/)
+has the upgrade and CVE-response procedure, which applies to both packaging
+paths.
+
+**`WALDUR_DOMAIN` is frozen once the homeserver has data.** It is the Matrix
+`server_name`, baked into every user and room ID. From 1.9.0 the homeserver
+also stamps it into the database on first boot and refuses to start under a
+different name:
+
+```text
+Critical error starting server: Database belongs to old.example; configured server name is new.example. Cannot reuse.
+```
+
+That is not a bug to work around by wiping `tuwunel_data` — wiping it discards
+the whole chat corpus. Changing the domain means a fresh homeserver.
 
 ## One-time appservice registration
 
