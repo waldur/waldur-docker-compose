@@ -374,6 +374,26 @@ http://keycloak:8080/auth/realms/<YOUR REALM>/.well-known/openid-configuration
 
 Two optional Compose profiles bring up a self-contained Matrix homeserver alongside Waldur — `matrix` for chat and `matrix-rtc` for Element Call voice/video. Activation, the one-time appservice registration, troubleshooting, and the rest of the operator guide live in `docs/matrix-chat-add-on.md` in this repo, and on the Waldur docs site under the docker-compose deployment guide.
 
+## Web shell (development only)
+
+Staff can open `waldur shell` in a browser tab from the Waldur user menu. It is meant for development and demo stacks: the web shell refuses to start unless `GLOBAL_DEBUG=true`, which also switches Django's debug mode on for the whole stack.
+
+Set in `.env`, matching your `WALDUR_DOMAIN`:
+
+```bash
+GLOBAL_DEBUG=true
+WALDUR_WEB_SHELL_ENABLED=true
+WALDUR_WEB_SHELL_URL=https://localhost/webshell/
+```
+
+Then start the stack with the `web-shell` profile:
+
+```bash
+docker compose --profile web-shell up -d
+```
+
+Caddy routes `/webshell/` to the `waldur-mastermind-web-shell` service (`config/caddy-includes/web-shell.conf`). That service mounts only the settings files: it deliberately has no access to the Docker socket, so a shell session cannot control the host.
+
 ## Integration with SLURM
 
 The integration is described [here](https://docs.waldur.com/latest/admin-guide/providers/site-agent/).
