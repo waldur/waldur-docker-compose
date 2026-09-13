@@ -26,6 +26,10 @@ x-mastermind-environment:
   - EMAIL_TIMEOUT=${EMAIL_TIMEOUT:-}
   - SENTRY_DSN=${SENTRY_DSN}
   - GLOBAL_DEBUG=${GLOBAL_DEBUG}
+  # Browser web shell (development only): needs GLOBAL_DEBUG=true and the
+  # `web-shell` profile. See the README.
+  - WALDUR_WEB_SHELL_ENABLED=${WALDUR_WEB_SHELL_ENABLED:-false}
+  - WALDUR_WEB_SHELL_URL=${WALDUR_WEB_SHELL_URL:-}
   - KEYCLOAK_SECRET=${KEYCLOAK_SECRET}
   - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT}
   # Memory tuning. Defaults match the image; override in .env to retune.
@@ -206,6 +210,30 @@ services:
         condition: service_started
         required: false
     command: mastermind
+    restart: always
+    extra_hosts: *default-mastermind-hosts
+
+  # Browser web shell (development only, `web-shell` profile). Serves
+  # `waldur shell` to staff at /webshell/ through Caddy, and refuses to start
+  # unless GLOBAL_DEBUG and WALDUR_WEB_SHELL_ENABLED are true. It mounts only
+  # the settings files, not the shared volume list: with the Docker socket, a
+  # Python shell would control the host.
+  waldur-mastermind-web-shell:
+    container_name: waldur-mastermind-web-shell
+    image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    profiles: [web-shell]
+    user: 1001:${DOCKER_GROUP_ID}
+    environment: *default-mastermind-env
+    volumes:
+      - ${CONFIG_FOLDER}/waldur-mastermind/override.conf.py:/etc/waldur/override.conf.py
+      - ${CONFIG_FOLDER}/waldur-mastermind/logging.conf.py:/etc/waldur/logging.conf.py
+      - ${CONFIG_FOLDER}/waldur-mastermind/saml2.conf.py:/etc/waldur/saml2.conf.py
+    depends_on:
+      waldur-db:
+        condition: service_healthy
+      waldur-mastermind-api:
+        condition: service_started
+    command: ["waldur", "web_shell", "--host", "0.0.0.0", "--port", "8090"]
     restart: always
     extra_hosts: *default-mastermind-hosts
 
