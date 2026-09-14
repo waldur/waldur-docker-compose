@@ -28,8 +28,8 @@ registration_shared_secret = "@@REG_TOKEN@@"
 max_request_size = 104857600
 
 # Federation must be ON for lk-jwt-service to verify Matrix OpenID tokens
-# via /_matrix/federation/v1/openid/userinfo (used during Element Call
-# token exchange). Disabling federation breaks Element Call.
+# via /_matrix/federation/v1/openid/userinfo (used during the call
+# token exchange). Disabling federation breaks calls.
 allow_federation = true
 
 [global.well_known]

@@ -333,7 +333,7 @@ services:
 
   # --- Matrix chat add-on ---
   # Activate with: docker compose --profile matrix up -d
-  # Add --profile matrix-rtc to enable Element Call (LiveKit voice/video).
+  # Add --profile matrix-rtc to enable voice/video calls (LiveKit).
   # See README "Matrix chat add-on" section for one-time appservice
   # registration steps and operational notes.
 
@@ -441,7 +441,7 @@ services:
   livekit:
     container_name: livekit
     profiles: [matrix-rtc]
-    image: 'livekit/livekit-server:${WALDUR_LIVEKIT_IMAGE_TAG:-v1.12.0}'
+    image: 'livekit/livekit-server:${WALDUR_LIVEKIT_IMAGE_TAG:-v1.13.7}'
     restart: always
     ports:
       - '${WALDUR_MATRIX_RTC_TCP_PORT:-7881}:7881/tcp'
@@ -476,7 +476,7 @@ services:
   lk-jwt-service:
     container_name: lk-jwt-service
     profiles: [matrix-rtc]
-    image: 'ghcr.io/element-hq/lk-jwt-service:${WALDUR_LK_JWT_IMAGE_TAG:-0.5.0}'
+    image: 'ghcr.io/element-hq/lk-jwt-service:${WALDUR_LK_JWT_IMAGE_TAG:-0.7.0}'
     restart: always
     # Share tuwunel's netns so federation discovery resolves "localhost"
     # back to the homeserver (same trick as docker/matrix-dev/).
