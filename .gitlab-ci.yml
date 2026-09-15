@@ -70,6 +70,8 @@ Test compose configuration:
     - curl -k -i https://docker | grep 200
     - curl -k -i https://docker/api/ | grep 401
     - curl -X POST -d '{"username":"admin","password":"password" }' -H "Content-type:application/json" -k -i https://docker/api-auth/password/ | grep 200
+    # /scim/ must reach mastermind (SCIM JSON), not fall through to homeport (HTML)
+    - 'curl -k -i https://docker/scim/v2/ServiceProviderConfig | grep -i "content-type: application/scim+json"'
   before_script:
     - apk add curl
     - |
