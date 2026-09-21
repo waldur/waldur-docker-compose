@@ -1,0 +1,14 @@
+# Languages offered in the web interface.
+#
+# This file SEEDS the setting: it is applied only while the value has never
+# been set. Once an administrator changes the language toggles in the UI
+# (Administration -> Look and feel), their choice is stored in the database and
+# this file is left alone on subsequent restarts.
+#
+# So to change the languages after first start, use the UI. Editing this file
+# then has no effect — clear the stored value first if you want the file to win
+# again.
+#
+# Comma-separated ISO codes, no spaces. Left commented out, nothing is seeded
+# and Waldur's own default list applies.
+#language_choices: 'en,et,lt,lv,ru,it,de,da,sv,es,fr,nb,ar,cs'

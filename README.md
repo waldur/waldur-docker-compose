@@ -86,6 +86,9 @@ Recently added or renamed:
 - `notifications-templates.yaml` — renamed from `notification-templates.yaml`.
   The old name never took effect: `initdb` reads the plural form.
 - `notifications.json` — added. Must exist even if empty (`{}`).
+- `languages.yaml` — added. Must exist; ships fully commented out, which is a
+  valid empty file. It seeds the language list on first start only, so language
+  toggles changed in the UI are no longer reverted on restart.
 
 ## Upgrade Instructions for PostgreSQL Images
 

@@ -52,6 +52,7 @@ x-mastermind-volumes:
   - ${CONFIG_FOLDER}/waldur-mastermind/auth.yaml:/etc/waldur/auth.yaml
   - ${CONFIG_FOLDER}/waldur-mastermind/support.yaml:/etc/waldur/support.yaml
   - ${CONFIG_FOLDER}/waldur-mastermind/whitelabeling.yaml:/etc/waldur/whitelabeling.yaml
+  - ${CONFIG_FOLDER}/waldur-mastermind/languages.yaml:/etc/waldur/languages.yaml
   - ${CONFIG_FOLDER}/waldur-mastermind/marketplace.yaml:/etc/waldur/marketplace.yaml
   - ${CONFIG_FOLDER}/waldur-mastermind/marketplace-script.yaml:/etc/waldur/marketplace-script.yaml
   - ${CONFIG_FOLDER}/whitelabeling:/etc/waldur/icons
@@ -390,6 +391,7 @@ services:
       - ${CONFIG_FOLDER}/waldur-mastermind/auth.yaml:/etc/waldur/auth.yaml
       - ${CONFIG_FOLDER}/waldur-mastermind/support.yaml:/etc/waldur/support.yaml
       - ${CONFIG_FOLDER}/waldur-mastermind/whitelabeling.yaml:/etc/waldur/whitelabeling.yaml
+      - ${CONFIG_FOLDER}/waldur-mastermind/languages.yaml:/etc/waldur/languages.yaml
       - ${CONFIG_FOLDER}/waldur-mastermind/marketplace.yaml:/etc/waldur/marketplace.yaml
       - ${CONFIG_FOLDER}/waldur-mastermind/marketplace-script.yaml:/etc/waldur/marketplace-script.yaml
       - ${CONFIG_FOLDER}/whitelabeling:/etc/waldur/icons
