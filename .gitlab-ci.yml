@@ -44,6 +44,10 @@ Test compose configuration:
   script:
     - cp -vf .env.example .env
     - echo "DOCKER_REGISTRY_PREFIX=registry.hpc.ut.ee/mirror/" >> .env
+    # This job only asserts that the stack comes up and answers a few HTTP
+    # requests; it queues no real work. Ten prefork children would cost the
+    # runner ~2 GB for nothing.
+    - echo "CELERYD_CONCURRENCY=2" >> .env
     - |
       if [ "$CI_PIPELINE_SOURCE" == "merge_request_event" ]; then
         echo "Testing using latest images"
