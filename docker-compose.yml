@@ -36,6 +36,8 @@ x-mastermind-environment:
   - GUNICORN_PRELOAD=${GUNICORN_PRELOAD:-true}
   - CELERY_WORKER_MAX_MEMORY_PER_CHILD=${CELERY_WORKER_MAX_MEMORY_PER_CHILD:-}
   - CELERYD_CONCURRENCY=${CELERYD_CONCURRENCY:-10}
+  # Daily anonymous usage report to telemetry.waldur.com. See .env.example.
+  - WALDUR_TELEMETRY_ENABLED=${WALDUR_TELEMETRY_ENABLED:-true}
 
 x-mastermind-volumes:
   &default-mastermind-volumes
