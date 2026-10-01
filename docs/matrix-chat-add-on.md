@@ -153,7 +153,9 @@ docker logs waldur-matrix-register
 `waldur-matrix-register` logs in as `@waldur-bootstrap`, unregisters the old
 registration and registers the new one. Tuwunel does not replace a registration
 that is registered again under the same id, which is why the old one is removed
-first. The container fails if the homeserver still rejects the new token. The room
+first. The container fails if the homeserver still rejects the new token. Events
+sent in the few seconds between the two steps, such as a bot command, are not
+delivered to Waldur. The room
 database in `tuwunel_data` is untouched, so existing rooms survive.
 
 Do not delete the secrets volume to rotate: that also replaces `BOOTSTRAP_PASSWORD`,
