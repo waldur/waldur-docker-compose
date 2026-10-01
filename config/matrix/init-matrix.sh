@@ -35,9 +35,16 @@ if [[ ! -f "${SECRETS}" ]]; then
 else
 	echo "matrix-init: reusing existing tokens from ${SECRETS}"
 	if ! grep -q '^BOOTSTRAP_PASSWORD=' "${SECRETS}"; then
-		# Not added now: a homeserver admin created without it has some other
-		# password, so a new one could not log in anyway.
-		echo "matrix-init: ${SECRETS} has no BOOTSTRAP_PASSWORD; rotated tokens will need register_matrix_appservice --admin-token"
+		# A stack set up before the bootstrap password existed. Its homeserver
+		# admin was not created with this password, so it does not make token
+		# rotation automatic here. It is still never worse than none: without
+		# one, register_matrix_appservice creates @waldur-bootstrap with a
+		# random password it never stores, and the account is lost to us.
+		if [[ -s "${SECRETS}" && -n "$(tail -c 1 "${SECRETS}")" ]]; then
+			echo >> "${SECRETS}"
+		fi
+		echo "BOOTSTRAP_PASSWORD=$(openssl rand -hex 32)" >> "${SECRETS}"
+		echo "matrix-init: added BOOTSTRAP_PASSWORD to ${SECRETS}. This stack predates it, so no homeserver admin uses it yet: rotating tokens here needs an existing admin's access token, see \"Token rotation\" in docs/matrix-chat-add-on.md"
 	fi
 fi
 
