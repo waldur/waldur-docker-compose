@@ -337,8 +337,8 @@ services:
   # --- Matrix chat add-on ---
   # Activate with: docker compose --profile matrix up -d
   # Add --profile matrix-rtc to enable voice/video calls (LiveKit).
-  # See README "Matrix chat add-on" section for one-time appservice
-  # registration steps and operational notes.
+  # See docs/matrix-chat-add-on.md for appservice registration, token
+  # rotation and operational notes.
 
   # Fix ownership of the matrix secrets volume so the init script can
   # write to it as the 1001 user. Mirrors waldur-launchzone-init-volume.

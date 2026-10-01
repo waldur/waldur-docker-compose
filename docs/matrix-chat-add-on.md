@@ -263,9 +263,9 @@ docker exec waldur-mastermind-worker waldur shell -c \
 # expect: True http://tuwunel.internal:6167 localhost
 ```
 
-After completing the **one-time appservice registration** above, visit `https://${WALDUR_DOMAIN}/projects/<uuid>/manage/?tab=chat` as a staff user and click **Create chat room**. The Manage tabs use query-param URLs (`?tab=chat`), not path segments — direct paths like `/manage/chat/` 404.
+Once `waldur-matrix-register` has registered the appservice (see Appservice registration above), visit `https://${WALDUR_DOMAIN}/projects/<uuid>/manage/?tab=chat` as a staff user and click **Create chat room**. The Manage tabs use query-param URLs (`?tab=chat`), not path segments — direct paths like `/manage/chat/` 404.
 
-Before the registration is pasted, room creation fails with `M_UNKNOWN_TOKEN` in `docker compose logs waldur-mastermind-worker` — that is expected and is the signal that Tuwunel still needs the appservice descriptor.
+Until the appservice is registered, room creation fails with `M_UNKNOWN_TOKEN` in `docker compose logs waldur-mastermind-worker`. Check `docker logs waldur-matrix-register` for why it is not.
 
 ## Troubleshooting
 
