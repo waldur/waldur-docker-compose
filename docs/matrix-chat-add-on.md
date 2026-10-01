@@ -66,9 +66,14 @@ Tuwunel does not load appservice descriptors from a file — it requires registr
 
 ```bash
 docker compose --profile matrix up -d
+docker wait waldur-matrix-register   # prints its exit code once it is done; 0 means registered
 docker logs waldur-matrix-register
 # Expect: Appservice 'waldur' registered on the homeserver.
 ```
+
+`up -d` returns before registration is done: nothing depends on the register
+container, and it may still be waiting for the homeserver. Read its log once
+`docker wait` has returned.
 
 The register container waits for the homeserver before it does anything, up to
 `WALDUR_MATRIX_REGISTER_WAIT_SECONDS` (default one hour), logging every 30 s.
@@ -145,6 +150,7 @@ docker run --rm -v waldur-docker-compose_waldur_matrix_secrets:/m alpine sh -c '
          -e "s/^HS_TOKEN=.*/HS_TOKEN=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d " \n")/" \
          /m/secrets.env'
 docker compose --profile matrix up -d
+docker wait waldur-matrix-register
 docker logs waldur-matrix-register
 # Expect: Appservice 'waldur' was registered under other tokens; replaced it with Waldur's.
 ```
