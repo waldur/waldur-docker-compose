@@ -2,10 +2,12 @@
 # Bootstraps the Matrix add-on inside waldur-docker-compose.
 #
 # Idempotent: generates AS/HS/registration tokens once into a shared volume,
-# renders the tuwunel.toml and the appservice descriptor that Tuwunel
-# operators paste into the !admin admin room, then seeds Constance via the
-# existing `override_constance_settings` management command (same pattern
-# as init-whitelabeling).
+# renders the tuwunel.toml and the appservice descriptor, then seeds Constance
+# via mastermind's `init_matrix_settings` management command.
+#
+# This is the first half of the Matrix bootstrap. The descriptor it renders is
+# submitted to the homeserver by the waldur-matrix-register container, which
+# runs after Tuwunel is up — see register-matrix.sh.
 
 set -euo pipefail
 
@@ -64,26 +66,36 @@ sed \
 	-e "s|@@LOCALPART@@|${LOCALPART}|g" \
 	"${TEMPLATES}/waldur-registration.yaml.template" > "${SHARED}/waldur-registration.yaml"
 
-# Render Constance overrides and apply via the existing management command.
+# Seed Constance through mastermind's `init_matrix_settings`, which the Helm
+# chart calls with these same variable names. Two reasons it is not
+# `override_constance_settings` like init-whitelabeling:
+#
+#   * that command drops any key the serializer rejects and still exits 0, so a
+#     malformed URL or a truncated token brings the stack up looking configured
+#     and fails every bot call later with M_UNKNOWN_TOKEN;
+#   * the key list would live here, in a shell heredoc, and drift from the
+#     backend. `init_matrix_settings` derives it from the Constance registry,
+#     so a new MATRIX_* setting needs no edit in this repo.
+#
+# Exported rather than written to a file because these are generated secrets:
+# `set -e` would skip a cleanup `rm` if the seeding step failed, leaving both
+# appservice tokens on disk in the container.
+#
 # Backend bot HTTP calls use MATRIX_HOMESERVER_URL (Docker DNS, internal).
 # Browser clients reach the homeserver via Caddy at MATRIX_HOMESERVER_PUBLIC_URL
 # — Django URLValidator rejects single-word hostnames so the internal value
 # uses the `tuwunel.internal` network alias defined in docker-compose.yml.
-CONSTANCE_YAML="$(mktemp)"
-cat > "${CONSTANCE_YAML}" <<-EOF
-	MATRIX_ENABLED: true
-	MATRIX_HOMESERVER_URL: http://tuwunel.internal:6167
-	MATRIX_HOMESERVER_PUBLIC_URL: https://${SERVER_NAME}
-	MATRIX_HOMESERVER_DOMAIN: ${SERVER_NAME}
-	MATRIX_APPSERVICE_AS_TOKEN: ${AS_TOKEN}
-	MATRIX_APPSERVICE_HS_TOKEN: ${HS_TOKEN}
-	MATRIX_APPSERVICE_SENDER_LOCALPART: ${LOCALPART}
-	MATRIX_USER_REGISTRATION_SECRET: ${REG_TOKEN}
-EOF
+export MATRIX_ENABLED=true
+export MATRIX_HOMESERVER_URL=http://tuwunel.internal:6167
+export MATRIX_HOMESERVER_PUBLIC_URL="https://${SERVER_NAME}"
+export MATRIX_HOMESERVER_DOMAIN="${SERVER_NAME}"
+export MATRIX_APPSERVICE_AS_TOKEN="${AS_TOKEN}"
+export MATRIX_APPSERVICE_HS_TOKEN="${HS_TOKEN}"
+export MATRIX_APPSERVICE_SENDER_LOCALPART="${LOCALPART}"
+export MATRIX_USER_REGISTRATION_SECRET="${REG_TOKEN}"
 
-waldur override_constance_settings "${CONSTANCE_YAML}"
-rm -f "${CONSTANCE_YAML}"
+waldur init_matrix_settings
 
 echo "matrix-init: Constance seeded. Rendered files in ${SHARED}:"
 ls -l "${SHARED}"
-echo "matrix-init: appservice descriptor at ${SHARED}/waldur-registration.yaml — paste this into Tuwunel's admin room via '!admin appservices register'"
+echo "matrix-init: appservice descriptor at ${SHARED}/waldur-registration.yaml — registered automatically by the waldur-matrix-register container; only needed by hand if WALDUR_MATRIX_REGISTER_APPSERVICE=false"

@@ -60,9 +60,28 @@ Critical error starting server: Database belongs to old.example; configured serv
 That is not a bug to work around by wiping `tuwunel_data` — wiping it discards
 the whole chat corpus. Changing the domain means a fresh homeserver.
 
-## One-time appservice registration
+## Appservice registration
 
-Tuwunel does not load appservice descriptors from a file — it requires registration via the `!admin appservices register` admin-room command. The `waldur-matrix-init` container renders a ready-to-paste descriptor into the `waldur_matrix_secrets` volume; do the following once after the first `--profile matrix up -d`.
+Tuwunel does not load appservice descriptors from a file — it requires registration via the `!admin appservices register` admin-room command. This is handled for you: the one-shot `waldur-matrix-register` container runs after the homeserver comes up, registers a bootstrap admin user with the generated registration token, and drives that admin-room command with the descriptor. There is nothing to paste.
+
+```bash
+docker compose --profile matrix up -d
+docker logs waldur-matrix-register
+# Expect: Appservice 'waldur' registered on the homeserver.
+```
+
+The register container waits for the homeserver before it does anything, up to
+`WALDUR_MATRIX_REGISTER_WAIT_SECONDS` (default one hour), logging every 30 s.
+After a Tuwunel bump that wait covers the in-place database migration, which
+runs silently before the homeserver listens and scales with the volume size.
+If the log shows the container gave up, raise the limit and `up` again — do not
+restart `tuwunel`.
+
+Re-running `up -d` is safe. The command first checks whether the appservice token already works and exits early when it does, so an already-configured stack is a no-op rather than a failed container.
+
+The one case it cannot handle is a homeserver that **already has users**: the bootstrap account earns its admin rights by being the first registered account, and its password is deliberately discarded, so it cannot be reused. Set `WALDUR_MATRIX_REGISTER_APPSERVICE=false` there and register by hand as below.
+
+### Registering by hand
 
 The default config has `WALDUR_MATRIX_OPEN_REGISTRATION=false`, so client-side registration (Element Web sign-up form) is disabled. Use Tuwunel's Synapse-compatible admin endpoint (HMAC-keyed by the registration secret) to provision the admin user. The snippet below does the whole thing — create admin, log in, find the auto-joined admin room, post the `!admin appservices register` message with the descriptor:
 
