@@ -91,9 +91,9 @@ The one case it cannot handle is a homeserver that **already has users** when it
 The default config has `WALDUR_MATRIX_OPEN_REGISTRATION=false`, so client-side registration (Element Web sign-up form) is disabled. Use Tuwunel's Synapse-compatible admin endpoint (HMAC-keyed by the registration secret) to provision the admin user. The snippet below does the whole thing — create admin, log in, find the auto-joined admin room, post the `!admin appservices register` message with the descriptor:
 
 ```bash
-# Pull the registration secret out of the shared volume
-REG_SECRET=$(docker run --rm -v waldur-docker-compose_waldur_matrix_secrets:/m alpine \
-  sh -c 'grep REG_TOKEN /m/secrets.env | cut -d= -f2')
+# Read the registration secret from the secrets volume
+REG_SECRET=$(docker compose --profile matrix run --rm --no-deps -T --entrypoint sed \
+  waldur-matrix-init-volume -n 's/^REG_TOKEN=//p' /var/lib/waldur/matrix/secrets.env)
 
 # Register an admin user via Synapse-compatible HMAC
 NONCE=$(curl -ks https://localhost/_synapse/admin/v1/register | python3 -c 'import sys,json; print(json.load(sys.stdin)["nonce"])')
@@ -109,7 +109,8 @@ ROOM=$(curl -ks -H "Authorization: Bearer $TOKEN" https://localhost/_matrix/clie
 ROOM_ENC=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$ROOM', safe=''))")
 
 # Post the !admin appservices register command with the rendered descriptor
-YAML=$(docker run --rm -v waldur-docker-compose_waldur_matrix_secrets:/m alpine cat /m/waldur-registration.yaml)
+YAML=$(docker compose --profile matrix run --rm --no-deps -T --entrypoint cat \
+  waldur-matrix-init-volume /var/lib/waldur/matrix/waldur-registration.yaml)
 BODY=$(python3 -c "import json; yaml='''$YAML'''; print(json.dumps({'msgtype':'m.text','body':'!admin appservices register\n\`\`\`yaml\n'+yaml+'\n\`\`\`'}))")
 curl -ks -X PUT -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   --data-binary "$BODY" \
@@ -145,10 +146,10 @@ be checked, so a new HS token alone reports "already registered" while Tuwunel's
 calls to Waldur start failing.
 
 ```bash
-docker run --rm -v waldur-docker-compose_waldur_matrix_secrets:/m alpine sh -c '
-  sed -i -e "s/^AS_TOKEN=.*/AS_TOKEN=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d " \n")/" \
-         -e "s/^HS_TOKEN=.*/HS_TOKEN=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d " \n")/" \
-         /m/secrets.env'
+docker compose --profile matrix run --rm --no-deps --entrypoint sh waldur-matrix-init-volume -c '
+  sed -i -e "s/^AS_TOKEN=.*/AS_TOKEN=$(openssl rand -hex 32)/" \
+         -e "s/^HS_TOKEN=.*/HS_TOKEN=$(openssl rand -hex 32)/" \
+         /var/lib/waldur/matrix/secrets.env'
 docker compose --profile matrix up -d
 docker wait waldur-matrix-register
 docker logs waldur-matrix-register
@@ -159,10 +160,12 @@ docker logs waldur-matrix-register
 `waldur-matrix-register` logs in as `@waldur-bootstrap`, unregisters the old
 registration and registers the new one. Tuwunel does not replace a registration
 that is registered again under the same id, which is why the old one is removed
-first. The container fails if the homeserver still rejects the new token. Events
-sent in the few seconds between the two steps, such as a bot command, are not
-delivered to Waldur. The room
-database in `tuwunel_data` is untouched, so existing rooms survive.
+first. The container fails if the homeserver still rejects the new token.
+
+Chat is down from the moment init seeds the new tokens until the register
+container finishes, usually tens of seconds. Events sent in that window, such as
+a bot command, are not delivered to Waldur. The room database in `tuwunel_data`
+is untouched, so existing rooms survive.
 
 Do not delete the secrets volume to rotate: that also replaces `BOOTSTRAP_PASSWORD`,
 which then no longer matches `@waldur-bootstrap` on the homeserver, and
