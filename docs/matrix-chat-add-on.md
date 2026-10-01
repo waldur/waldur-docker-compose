@@ -134,8 +134,10 @@ After a hard reload (Cmd-Shift-R / Ctrl-Shift-R), project views show the **Commu
 
 ## Token rotation
 
-To rotate the AS/HS tokens (e.g., after credential exposure), replace them in the
-secrets volume and bring the profile up again:
+To rotate the AS/HS tokens (e.g., after credential exposure), replace both in the
+secrets volume and bring the profile up again. Always both: only the AS token can
+be checked, so a new HS token alone reports "already registered" while Tuwunel's
+calls to Waldur start failing.
 
 ```bash
 docker run --rm -v waldur-docker-compose_waldur_matrix_secrets:/m alpine sh -c '
