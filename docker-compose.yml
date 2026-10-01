@@ -472,6 +472,10 @@ services:
         condition: service_completed_successfully
       tuwunel:
         condition: service_started
+      # Started after a recreated API, so the script's wait for Waldur to
+      # answer cannot be satisfied by the container about to be replaced.
+      waldur-mastermind-api:
+        condition: service_started
     command: ["/etc/waldur/matrix/register-matrix.sh"]
     restart: "no"
 

@@ -68,6 +68,30 @@ except Exception:
 done
 echo "matrix-register: homeserver is up after ${SECONDS}s"
 
+# The command ends by asking the homeserver to ping Waldur at CALLBACK_URL. An
+# `up` that recreates the API (every image bump) runs this before gunicorn
+# listens, so that ping would report a broken callback on a healthy upgrade.
+# Any HTTP answer will do: the endpoint rejects an unauthenticated probe, and an
+# https URL behind Caddy's internal CA would never verify. Not waiting forever:
+# the command still registers, and only warns about the ping.
+API_WAIT_LIMIT=300
+SECONDS=0
+until python3 -c "
+import ssl, sys, urllib.error, urllib.request
+try:
+    urllib.request.urlopen('${CALLBACK_URL}/_matrix/app/v1/ping', timeout=5, context=ssl._create_unverified_context())
+except urllib.error.HTTPError:
+    pass
+except Exception:
+    sys.exit(1)
+" 2>/dev/null; do
+	if (( SECONDS >= API_WAIT_LIMIT )); then
+		echo "matrix-register: Waldur did not answer at ${CALLBACK_URL} within ${API_WAIT_LIMIT}s; registering anyway"
+		break
+	fi
+	sleep 2
+done
+
 # Read on its own rather than sourcing the file, which also holds the tokens
 # this command takes from Constance.
 SECRETS=/var/lib/waldur/matrix/secrets.env
