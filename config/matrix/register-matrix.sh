@@ -25,9 +25,9 @@ HOMESERVER="http://tuwunel.internal:6167"
 # internal Docker DNS, not the public Caddy address.
 CALLBACK_URL="${WALDUR_MATRIX_APPSERVICE_URL:-http://waldur-mastermind-api:8080}"
 
-# Tuwunel is distroless, so compose cannot health-check it and `depends_on`
-# only tells us the container started. Wait for the client API to answer
-# before assuming the homeserver is ready to take an admin command.
+# `depends_on` only waits for Tuwunel to start. Its image health check would
+# mark a homeserver that is still migrating unhealthy and fail the whole `up`,
+# so wait for the client API to answer instead.
 #
 # The wait has to outlast a database migration: Tuwunel migrates its embedded
 # database in place before it opens the listener, prints nothing while doing
@@ -57,5 +57,11 @@ except Exception:
 	waited=$((waited + INTERVAL))
 done
 echo "matrix-register: homeserver is up after ${waited}s"
+
+# Read on its own rather than sourcing the file, which also holds the tokens
+# this command takes from Constance.
+SECRETS=/var/lib/waldur/matrix/secrets.env
+MATRIX_BOOTSTRAP_PASSWORD="$(sed -n 's/^BOOTSTRAP_PASSWORD=//p' "${SECRETS}")"
+export MATRIX_BOOTSTRAP_PASSWORD
 
 waldur register_matrix_appservice --url "${CALLBACK_URL}"

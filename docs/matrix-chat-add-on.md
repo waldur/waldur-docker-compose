@@ -62,7 +62,7 @@ the whole chat corpus. Changing the domain means a fresh homeserver.
 
 ## Appservice registration
 
-Tuwunel does not load appservice descriptors from a file — it requires registration via the `!admin appservices register` admin-room command. This is handled for you: the one-shot `waldur-matrix-register` container runs after the homeserver comes up, registers a bootstrap admin user with the generated registration token, and drives that admin-room command with the descriptor. There is nothing to paste.
+Tuwunel does not load appservice descriptors from a file — it requires registration via the `!admin appservices register` admin-room command. This is handled for you: the one-shot `waldur-matrix-register` container runs after the homeserver comes up, registers a bootstrap admin user, `@waldur-bootstrap`, with the generated registration token and `BOOTSTRAP_PASSWORD` from the secrets volume, and drives that admin-room command with the descriptor. There is nothing to paste.
 
 ```bash
 docker compose --profile matrix up -d
@@ -79,7 +79,7 @@ restart `tuwunel`.
 
 Re-running `up -d` is safe. The command first checks whether the appservice token already works and exits early when it does, so an already-configured stack is a no-op rather than a failed container.
 
-The one case it cannot handle is a homeserver that **already has users**: the bootstrap account earns its admin rights by being the first registered account, and its password is deliberately discarded, so it cannot be reused. Set `WALDUR_MATRIX_REGISTER_APPSERVICE=false` there and register by hand as below.
+The one case it cannot handle is a homeserver that **already has users** when it first runs: the bootstrap account earns its admin rights by being the first registered account. Set `WALDUR_MATRIX_REGISTER_APPSERVICE=false` there and register by hand as below.
 
 ### Registering by hand
 
@@ -134,15 +134,30 @@ After a hard reload (Cmd-Shift-R / Ctrl-Shift-R), project views show the **Commu
 
 ## Token rotation
 
-To rotate AS/HS tokens (e.g., after credential exposure):
+To rotate the AS/HS tokens (e.g., after credential exposure), replace them in the
+secrets volume and bring the profile up again:
 
 ```bash
-docker compose --profile matrix --profile matrix-rtc down
-docker volume rm waldur-docker-compose_waldur_matrix_secrets
-docker compose --profile matrix --profile matrix-rtc up -d
+docker run --rm -v waldur-docker-compose_waldur_matrix_secrets:/m alpine sh -c '
+  sed -i -e "s/^AS_TOKEN=.*/AS_TOKEN=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d " \n")/" \
+         -e "s/^HS_TOKEN=.*/HS_TOKEN=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d " \n")/" \
+         /m/secrets.env'
+docker compose --profile matrix up -d
+docker logs waldur-matrix-register
+# Expect: Appservice 'waldur' was registered under other tokens; replaced it with Waldur's.
 ```
 
-On re-up, `waldur-matrix-init` generates fresh tokens, re-renders the descriptor, and re-seeds Constance. **Re-run the one-time appservice registration step** above — Tuwunel still holds the old descriptor until you re-register, and the bot will fail with `M_UNKNOWN_TOKEN` in the meantime. The room database in `tuwunel_data` is untouched, so existing rooms survive.
+`waldur-matrix-init` seeds the new tokens into Constance, and
+`waldur-matrix-register` logs in as `@waldur-bootstrap`, unregisters the old
+registration and registers the new one. Tuwunel does not replace a registration
+that is registered again under the same id, which is why the old one is removed
+first. The container fails if the homeserver still rejects the new token. The room
+database in `tuwunel_data` is untouched, so existing rooms survive.
+
+Do not delete the secrets volume to rotate: that also replaces `BOOTSTRAP_PASSWORD`,
+which then no longer matches `@waldur-bootstrap` on the homeserver, and
+registration fails. A stack set up before the bootstrap password existed has none;
+rotate there by registering by hand as above.
 
 ## LiveKit / voice & video notes
 

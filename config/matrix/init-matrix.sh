@@ -21,15 +21,24 @@ if [[ ! -f "${SECRETS}" ]]; then
 	AS_TOKEN="$(openssl rand -hex 32)"
 	HS_TOKEN="$(openssl rand -hex 32)"
 	REG_TOKEN="$(openssl rand -hex 32)"
+	# Password of the homeserver admin that waldur-matrix-register creates, so
+	# later runs can log back in and apply rotated tokens.
+	BOOTSTRAP_PASSWORD="$(openssl rand -hex 32)"
 	umask 077
 	cat > "${SECRETS}" <<-EOF
 		AS_TOKEN=${AS_TOKEN}
 		HS_TOKEN=${HS_TOKEN}
 		REG_TOKEN=${REG_TOKEN}
+		BOOTSTRAP_PASSWORD=${BOOTSTRAP_PASSWORD}
 	EOF
-	echo "matrix-init: generated fresh AS/HS/registration tokens"
+	echo "matrix-init: generated fresh AS/HS/registration tokens and bootstrap password"
 else
 	echo "matrix-init: reusing existing tokens from ${SECRETS}"
+	if ! grep -q '^BOOTSTRAP_PASSWORD=' "${SECRETS}"; then
+		# Not added now: a homeserver admin created without it has some other
+		# password, so a new one could not log in anyway.
+		echo "matrix-init: ${SECRETS} has no BOOTSTRAP_PASSWORD; rotated tokens will need register_matrix_appservice --admin-token"
+	fi
 fi
 
 # shellcheck disable=SC1090
@@ -56,15 +65,6 @@ sed \
 awk -v block="${RTC_BLOCK}" '{ gsub(/@@RTC_BLOCK@@/, block); print }' \
 	"${SHARED}/tuwunel.toml.tmp" > "${SHARED}/tuwunel.toml"
 rm -f "${SHARED}/tuwunel.toml.tmp"
-
-# Render appservice descriptor (the YAML the operator pastes into Tuwunel's
-# admin room via `!admin appservices register`).
-sed \
-	-e "s|@@AS_TOKEN@@|${AS_TOKEN}|g" \
-	-e "s|@@HS_TOKEN@@|${HS_TOKEN}|g" \
-	-e "s|@@SERVER_NAME@@|${SERVER_NAME}|g" \
-	-e "s|@@LOCALPART@@|${LOCALPART}|g" \
-	"${TEMPLATES}/waldur-registration.yaml.template" > "${SHARED}/waldur-registration.yaml"
 
 # Seed Constance through mastermind's `init_matrix_settings`, which the Helm
 # chart calls with these same variable names. Two reasons it is not
@@ -95,6 +95,14 @@ export MATRIX_APPSERVICE_SENDER_LOCALPART="${LOCALPART}"
 export MATRIX_USER_REGISTRATION_SECRET="${REG_TOKEN}"
 
 waldur init_matrix_settings
+
+# The descriptor for registering by hand (see docs/matrix-chat-add-on.md).
+# Rendered by mastermind from the settings just seeded, so it declares the same
+# namespaces as what waldur-matrix-register sends, room aliases included.
+umask 077
+waldur generate_appservice_registration \
+	--url "${WALDUR_MATRIX_APPSERVICE_URL:-http://waldur-mastermind-api:8080}" \
+	> "${SHARED}/waldur-registration.yaml"
 
 echo "matrix-init: Constance seeded. Rendered files in ${SHARED}:"
 ls -l "${SHARED}"
