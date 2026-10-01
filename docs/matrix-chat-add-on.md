@@ -84,7 +84,13 @@ restart `tuwunel`.
 
 Re-running `up -d` is safe. The command first checks whether the appservice token already works and exits early when it does, so an already-configured stack is a no-op rather than a failed container.
 
-The one case it cannot handle is a homeserver that **already has users** when it first runs: the bootstrap account earns its admin rights by being the first registered account. Set `WALDUR_MATRIX_REGISTER_APPSERVICE=false` there and register by hand as below.
+A stack registered by hand before this container existed works with it switched
+on: it finds the registration in place and changes nothing. What it cannot do
+there on its own is apply rotated tokens. The bootstrap account earns its admin
+rights by being the homeserver's first account, and on that stack the first
+account is someone else's, so rotation there takes an admin's access token (see
+Token rotation). Set `WALDUR_MATRIX_REGISTER_APPSERVICE=false` to keep
+registration entirely manual, as below.
 
 ### Registering by hand
 
@@ -124,6 +130,17 @@ curl -ks -H "Authorization: Bearer $TOKEN" \
 ```
 
 The bot then becomes `@waldur-bot:<your-domain>` and can post on Waldur's behalf.
+
+The snippet only registers. If the homeserver already holds a `waldur`
+registration, after a token rotation say, Tuwunel answers `Duplicate id` and
+keeps the old tokens. Unregister it first from the same shell, check the reply
+with the confirm step, then post the register command again:
+
+```bash
+curl -ks -X PUT -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  --data-binary '{"msgtype":"m.text","body":"!admin appservices unregister waldur"}' \
+  "https://localhost/_matrix/client/v3/rooms/$ROOM_ENC/send/m.room.message/unregister-$(date +%s)"
+```
 
 **Prefer Element Web?** Set `WALDUR_MATRIX_OPEN_REGISTRATION=true` in `.env` before the first `--profile matrix up -d`, then register the admin user via the Element Web sign-up form using `REG_TOKEN` from the secrets volume. Switch the flag back to `false` afterwards (re-render takes effect on the next `--profile matrix up -d`).
 
@@ -169,8 +186,30 @@ is untouched, so existing rooms survive.
 
 Do not delete the secrets volume to rotate: that also replaces `BOOTSTRAP_PASSWORD`,
 which then no longer matches `@waldur-bootstrap` on the homeserver, and
-registration fails. A stack set up before the bootstrap password existed has none;
-rotate there by registering by hand as above.
+registration fails.
+
+### Stacks registered by hand
+
+A stack set up before the bootstrap password existed, typically one registered
+by hand, gets a `BOOTSTRAP_PASSWORD` added on its next `up`
+(`waldur-matrix-init` logs it). Its homeserver admin is still not
+`@waldur-bootstrap`, though, so the register container cannot log in with it.
+Rotate as above, but hand over the access token of an existing homeserver admin
+for the `up` that applies the new tokens:
+
+```bash
+WALDUR_MATRIX_ADMIN_TOKEN=<admin access token> docker compose --profile matrix up -d
+docker wait waldur-matrix-register
+docker logs waldur-matrix-register
+```
+
+`register_matrix_appservice` uses that admin to unregister the old registration
+and register the new one. The token comes from your shell for that one command;
+do not keep it in `.env`. Without it, the container fails instead: it creates a
+`@waldur-bootstrap` that is not an admin and cannot reach the admin room.
+
+Registering the descriptor again by hand does not rotate on its own: unregister
+first, as described under Registering by hand.
 
 ## LiveKit / voice & video notes
 
@@ -230,7 +269,7 @@ Before the registration is pasted, room creation fails with `M_UNKNOWN_TOKEN` in
 
 ## Troubleshooting
 
-- **`M_UNKNOWN_TOKEN` in worker logs after a token rotation**: re-run the one-time appservice registration step. The descriptor Tuwunel has is stale.
+- **`M_UNKNOWN_TOKEN` in worker logs after a token rotation**: the homeserver still holds the registration with the old tokens. Check `docker logs waldur-matrix-register` and see Token rotation. Registering the descriptor again by hand does not fix it on its own: Tuwunel keeps the old tokens for an id it already has, so unregister first.
 - **Webhook `DisallowedHost` errors**: the appservice descriptor is rendered with `url: http://waldur-mastermind-api:8080` (the Compose service name), which is in `ALLOWED_HOSTS` for the dockerised settings. If you change the URL — for example to call back via an external hostname — patch `ALLOWED_HOSTS` in `config/waldur-mastermind/override.conf.py`.
 - **Browser chat drawer fails to connect**: the backend talks to Tuwunel internally at `http://tuwunel.internal:6167` (Docker DNS); the browser must reach Tuwunel through Caddy at `https://${WALDUR_DOMAIN}`. `waldur-matrix-init` seeds both — backend uses `MATRIX_HOMESERVER_URL`, browser-facing endpoints serve `MATRIX_HOMESERVER_PUBLIC_URL` (requires `waldur-mastermind` >= 8.x with the dual-URL split). If the chat drawer logs CSP errors connecting to `tuwunel.internal`, verify `MATRIX_HOMESERVER_PUBLIC_URL` is set: `docker exec waldur-mastermind-worker waldur shell -c "from constance import config; print(config.MATRIX_HOMESERVER_PUBLIC_URL)"`.
 - **A call shows "Could not connect to the call."**: confirm `--profile matrix-rtc` is active, then check the call token request to `https://${WALDUR_DOMAIN}/lk-jwt/…` in the browser's network tab and `docker compose logs lk-jwt-service`. Common causes: `WALDUR_DOMAIN=localhost` (see the LiveKit notes above); a `WALDUR_DOMAIN` mismatch with `LIVEKIT_FULL_ACCESS_HOMESERVERS`; or `400 Missing room parameter` from `/lk-jwt/sfu/get`, which means the homeport image still posts to lk-jwt's legacy endpoint while lk-jwt is 0.6.0 or newer. Keep `WALDUR_HOMEPORT_IMAGE_TAG` and `WALDUR_LK_JWT_IMAGE_TAG` at the versions `.env.example` pins.
