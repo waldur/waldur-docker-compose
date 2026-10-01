@@ -172,7 +172,7 @@ docker compose --profile matrix run --rm --no-deps --entrypoint sh waldur-matrix
 docker compose --profile matrix up -d
 docker wait waldur-matrix-register
 docker logs waldur-matrix-register
-# Expect: Appservice 'waldur' was registered under other tokens; replaced it with Waldur's.
+# Expect: Appservice 'waldur' was registered with other tokens, another URL or other namespaces; replaced it with Waldur's.
 ```
 
 `waldur-matrix-init` seeds the new tokens into Constance, and
