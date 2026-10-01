@@ -225,9 +225,10 @@ first, as described under Registering by hand.
 `waldur-matrix-init` refuses to overwrite appservice tokens in Constance that
 differ from the ones in `secrets.env` and that no deployment seeded, for example
 tokens rotated in the Setup wizard. Seeding over them would break chat until the
-homeserver got a new registration, so init fails and logs why. The homeserver
-does not start while init fails; read `docker logs waldur-matrix-init`. Then
-either keep Waldur's tokens or replace them with the ones in `secrets.env`.
+homeserver got a new registration, so init fails and logs why. Until you
+resolve it, `waldur-matrix-init` fails on every `up` and Tuwunel does not start;
+read `docker logs waldur-matrix-init`. Either keep Waldur's tokens or replace
+them with the ones in `secrets.env`.
 
 **To keep the tokens Waldur holds**, read them with `waldur shell` as under
 Verifying the add-on, write them into `secrets.env` as `AS_TOKEN` and `HS_TOKEN`
@@ -235,8 +236,9 @@ the way the rotation command above edits that file, and `up` again. Init then
 finds them equal and seeds as usual, and the register container registers them
 if the homeserver does not have them yet.
 
-**To replace them with the ones in `secrets.env`**, adopt them once and let the
-register container re-register:
+**To replace them with the ones in `secrets.env`**, adopt them for one `up`.
+Init seeds them over Waldur's, and the register container then replaces the
+homeserver's registration with them:
 
 ```bash
 WALDUR_MATRIX_ADOPT_TOKENS=true docker compose --profile matrix up -d
@@ -245,9 +247,9 @@ docker logs waldur-matrix-register
 ```
 
 On a stack registered by hand, pass `WALDUR_MATRIX_ADMIN_TOKEN` in the same
-command, as above. Set `WALDUR_MATRIX_ADOPT_TOKENS` for that one command only:
-kept in `.env`, every later `up` would overwrite tokens changed outside compose
-without asking.
+command, as above. Set `WALDUR_MATRIX_ADOPT_TOKENS` for that one command only,
+and unset it again if you exported it or put it in `.env`: left set, every later
+`up` would overwrite tokens changed outside compose without asking.
 
 ## LiveKit / voice & video notes
 
