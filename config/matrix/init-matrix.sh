@@ -92,7 +92,11 @@ rm -f "${SHARED}/tuwunel.toml.tmp"
 # Browser clients reach the homeserver via Caddy at MATRIX_HOMESERVER_PUBLIC_URL
 # — Django URLValidator rejects single-word hostnames so the internal value
 # uses the `tuwunel.internal` network alias defined in docker-compose.yml.
-export MATRIX_ENABLED=true
+#
+# MATRIX_ENABLED is deliberately not exported. `init_matrix_settings` switches
+# chat on only while nothing is stored for it, and an environment value would
+# win on every run: an admin who turned chat off would find it back on after
+# the next `up`.
 export MATRIX_HOMESERVER_URL=http://tuwunel.internal:6167
 export MATRIX_HOMESERVER_PUBLIC_URL="https://${SERVER_NAME}"
 export MATRIX_HOMESERVER_DOMAIN="${SERVER_NAME}"

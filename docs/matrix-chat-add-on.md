@@ -123,7 +123,7 @@ The bot then becomes `@waldur-bot:<your-domain>` and can post on Waldur's behalf
 
 ## Enabling the homeport UI
 
-Backend access to Matrix is gated by the `MATRIX_ENABLED` Constance flag (auto-set by `waldur-matrix-init`). The homeport UI is gated separately by a feature flag — enable it once via the `load_features` management command:
+Backend access to Matrix is gated by the `MATRIX_ENABLED` Constance flag. `waldur-matrix-init` switches it on only while no value is stored, so turning chat off in Administration survives the next `up`. The homeport UI is gated separately by a feature flag — enable it once via the `load_features` management command:
 
 ```bash
 docker exec waldur-mastermind-worker bash -c \
