@@ -84,11 +84,13 @@ restart `tuwunel`.
 
 Re-running `up -d` is safe. The command first checks whether the appservice token already works and exits early when it does, so an already-configured stack is a no-op rather than a failed container.
 
-A stack registered by hand before this container existed works with it switched
-on: it finds the registration in place and changes nothing. What it cannot do
-there on its own is apply rotated tokens. The bootstrap account earns its admin
-rights by being the homeserver's first account, and on that stack the first
-account is someone else's, so rotation there takes an admin's access token (see
+A stack registered by hand before this container existed can keep it switched
+on, and registration keeps working: the register container finds the appservice
+live and exits 0. What it cannot do there is change the registration. The
+bootstrap account earns its admin rights by being the homeserver's first
+account, and on that stack the first account is someone else's, so the
+container logs a warning instead of applying a changed descriptor, and rotating
+tokens takes that admin's access token (see Stacks registered by hand under
 Token rotation). Set `WALDUR_MATRIX_REGISTER_APPSERVICE=false` to keep
 registration entirely manual, as below.
 
@@ -191,11 +193,18 @@ registration fails.
 ### Stacks registered by hand
 
 A stack set up before the bootstrap password existed, typically one registered
-by hand, gets a `BOOTSTRAP_PASSWORD` added on its next `up`
-(`waldur-matrix-init` logs it). Its homeserver admin is still not
-`@waldur-bootstrap`, though, so the register container cannot log in with it.
-Rotate as above, but hand over the access token of an existing homeserver admin
-for the `up` that applies the new tokens:
+by hand, upgrades without extra steps. `waldur-matrix-init` seeds the same
+tokens from `secrets.env`, records that compose now manages them and adds a
+`BOOTSTRAP_PASSWORD` (it logs that), and registration keeps working. The
+exception is a stack whose tokens were changed after setup; see Tokens changed
+outside compose below.
+
+Its homeserver admin is still not `@waldur-bootstrap`, so the register
+container has no admin access there. While the appservice token works, it logs
+a warning about that and exits 0. Rotating tokens, or applying a changed
+descriptor, needs the access token of that existing homeserver admin for the
+`up` that applies the change. For a rotation, edit `secrets.env` as above
+first, then:
 
 ```bash
 WALDUR_MATRIX_ADMIN_TOKEN=<admin access token> docker compose --profile matrix up -d
@@ -205,8 +214,8 @@ docker logs waldur-matrix-register
 
 `register_matrix_appservice` uses that admin to unregister the old registration
 and register the new one. The token comes from your shell for that one command;
-do not keep it in `.env`. Without it, the container fails instead: it creates a
-`@waldur-bootstrap` that is not an admin and cannot reach the admin room.
+do not keep it in `.env`. Without it, a rotation fails the register container,
+and chat stays down until you run the command above.
 
 Registering the descriptor again by hand does not rotate on its own: unregister
 first, as described under Registering by hand.
