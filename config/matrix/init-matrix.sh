@@ -99,11 +99,30 @@ waldur init_matrix_settings
 # The descriptor for registering by hand (see docs/matrix-chat-add-on.md).
 # Rendered by mastermind from the settings just seeded, so it declares the same
 # namespaces as what waldur-matrix-register sends, room aliases included.
+#
+# Only the manual path reads it, so a failure here is a warning: it must not
+# keep Tuwunel from starting. Rendered to a temporary file and checked before it
+# replaces the old one, because mastermind logs to stdout too, and one stray log
+# line would turn the YAML into something the homeserver rejects.
+DESCRIPTOR="${SHARED}/waldur-registration.yaml"
 umask 077
-waldur generate_appservice_registration \
+if waldur generate_appservice_registration \
 	--url "${WALDUR_MATRIX_APPSERVICE_URL:-http://waldur-mastermind-api:8080}" \
-	> "${SHARED}/waldur-registration.yaml"
+	> "${DESCRIPTOR}.tmp" &&
+	python3 -c '
+import sys, yaml
+with open(sys.argv[1]) as f:
+    doc = yaml.safe_load(f)
+sys.exit(0 if isinstance(doc, dict) and doc.get("id") == "waldur" else 1)
+' "${DESCRIPTOR}.tmp" 2>/dev/null; then
+	mv "${DESCRIPTOR}.tmp" "${DESCRIPTOR}"
+	echo "matrix-init: appservice descriptor at ${DESCRIPTOR} — registered automatically by the waldur-matrix-register container; only needed by hand if WALDUR_MATRIX_REGISTER_APPSERVICE=false"
+else
+	# An older descriptor may hold tokens that were rotated since; registering
+	# it by hand would put the homeserver and Waldur out of step again.
+	rm -f "${DESCRIPTOR}.tmp" "${DESCRIPTOR}"
+	echo "matrix-init: WARNING: could not render the appservice descriptor, so ${DESCRIPTOR} is absent. Automatic registration does not need it; registering by hand does." >&2
+fi
 
 echo "matrix-init: Constance seeded. Rendered files in ${SHARED}:"
 ls -l "${SHARED}"
-echo "matrix-init: appservice descriptor at ${SHARED}/waldur-registration.yaml — registered automatically by the waldur-matrix-register container; only needed by hand if WALDUR_MATRIX_REGISTER_APPSERVICE=false"
