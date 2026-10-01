@@ -148,7 +148,7 @@ curl -ks -X PUT -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/
 
 ## Enabling the homeport UI
 
-Backend access to Matrix is gated by the `MATRIX_ENABLED` Constance flag. `waldur-matrix-init` switches it on only while no value is stored, so turning chat off in Administration survives the next `up`. The homeport UI is gated separately by a feature flag — enable it once via the `load_features` management command:
+Backend access to Matrix is gated by the `MATRIX_ENABLED` Constance flag. `waldur-matrix-init` switches it on the first time it seeds the Matrix settings and leaves it alone after that, so turning chat off in Administration survives the next `up`. The homeport UI is gated separately by a feature flag — enable it once via the `load_features` management command:
 
 ```bash
 docker exec waldur-mastermind-worker bash -c \

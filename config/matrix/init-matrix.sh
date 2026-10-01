@@ -94,9 +94,9 @@ rm -f "${SHARED}/tuwunel.toml.tmp"
 # uses the `tuwunel.internal` network alias defined in docker-compose.yml.
 #
 # MATRIX_ENABLED is deliberately not exported. `init_matrix_settings` switches
-# chat on only while nothing is stored for it, and an environment value would
-# win on every run: an admin who turned chat off would find it back on after
-# the next `up`.
+# chat on at the first seed (while MATRIX_TOKENS_MANAGED_BY is still blank) and
+# leaves it alone on every later run, but an environment value applies on every
+# run: an admin who turned chat off would find it back on after the next `up`.
 export MATRIX_HOMESERVER_URL=http://tuwunel.internal:6167
 export MATRIX_HOMESERVER_PUBLIC_URL="https://${SERVER_NAME}"
 export MATRIX_HOMESERVER_DOMAIN="${SERVER_NAME}"
