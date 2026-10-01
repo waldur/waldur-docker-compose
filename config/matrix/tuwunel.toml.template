@@ -1,3 +1,6 @@
+# Tuwunel reads the rendered file only at start, and compose recreates it only
+# when the tuwunel service in docker-compose.yml changes. A change here reaches
+# running stacks with a change there, or once operators restart tuwunel.
 [global]
 
 server_name = "@@SERVER_NAME@@"
@@ -31,6 +34,14 @@ max_request_size = 104857600
 # via /_matrix/federation/v1/openid/userinfo (used during the call
 # token exchange). Disabling federation breaks calls.
 allow_federation = true
+
+# No DNS cache. The appservice URL names the mastermind API container, whose IP
+# changes whenever compose recreates it (every image bump), and a cached answer
+# keeps the homeserver dialling the old IP: the bot stops hearing messages for
+# up to dns_min_ttl (3 h) by default, or Docker's 600 s TTL with
+# dns_passthru_appservices. Docker's embedded DNS answers locally, and on a
+# single host outbound federation is rare, so a lookup per request costs little.
+dns_cache_entries = 0
 
 [global.well_known]
 client = "https://@@SERVER_NAME@@"

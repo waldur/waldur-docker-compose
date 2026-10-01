@@ -482,6 +482,11 @@ services:
     restart: always
     environment:
       TUWUNEL_CONFIG: /etc/waldur/matrix/tuwunel.toml
+      # Tuwunel ignores these (it reads TUWUNEL_*). They change what
+      # waldur-matrix-init renders into tuwunel.toml, which Tuwunel reads only
+      # at start, and listing them here makes compose recreate it on a change.
+      WALDUR_MATRIX_RTC_ENABLED: ${WALDUR_MATRIX_RTC_ENABLED:-false}
+      WALDUR_MATRIX_OPEN_REGISTRATION: ${WALDUR_MATRIX_OPEN_REGISTRATION:-false}
     volumes:
       - tuwunel_data:/var/lib/tuwunel
       - waldur_matrix_secrets:/etc/waldur/matrix:ro
