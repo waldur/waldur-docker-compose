@@ -211,6 +211,35 @@ do not keep it in `.env`. Without it, the container fails instead: it creates a
 Registering the descriptor again by hand does not rotate on its own: unregister
 first, as described under Registering by hand.
 
+### Tokens changed outside compose
+
+`waldur-matrix-init` refuses to overwrite appservice tokens in Constance that
+differ from the ones in `secrets.env` and that no deployment seeded, for example
+tokens rotated in the Setup wizard. Seeding over them would break chat until the
+homeserver got a new registration, so init fails and logs why. The homeserver
+does not start while init fails; read `docker logs waldur-matrix-init`. Then
+either keep Waldur's tokens or replace them with the ones in `secrets.env`.
+
+**To keep the tokens Waldur holds**, read them with `waldur shell` as under
+Verifying the add-on, write them into `secrets.env` as `AS_TOKEN` and `HS_TOKEN`
+the way the rotation command above edits that file, and `up` again. Init then
+finds them equal and seeds as usual, and the register container registers them
+if the homeserver does not have them yet.
+
+**To replace them with the ones in `secrets.env`**, adopt them once and let the
+register container re-register:
+
+```bash
+WALDUR_MATRIX_ADOPT_TOKENS=true docker compose --profile matrix up -d
+docker wait waldur-matrix-register
+docker logs waldur-matrix-register
+```
+
+On a stack registered by hand, pass `WALDUR_MATRIX_ADMIN_TOKEN` in the same
+command, as above. Set `WALDUR_MATRIX_ADOPT_TOKENS` for that one command only:
+kept in `.env`, every later `up` would overwrite tokens changed outside compose
+without asking.
+
 ## LiveKit / voice & video notes
 
 `WALDUR_LIVEKIT_NODE_IP` advertises the host's RTC media address to clients. The default `127.0.0.1` is correct for a local demo only — for any reachable deployment, set this to the host's external IP or DNS name so remote clients can connect. The RTC media ports (`WALDUR_MATRIX_RTC_TCP_PORT`/`UDP_PORT`, default 7881/7882) must also be reachable from clients.

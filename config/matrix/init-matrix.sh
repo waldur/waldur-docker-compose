@@ -105,7 +105,16 @@ export MATRIX_APPSERVICE_HS_TOKEN="${HS_TOKEN}"
 export MATRIX_APPSERVICE_SENDER_LOCALPART="${LOCALPART}"
 export MATRIX_USER_REGISTRATION_SECRET="${REG_TOKEN}"
 
-waldur init_matrix_settings
+# The command refuses to overwrite appservice tokens that differ from these and
+# that no deployment seeded (rotated in the Setup wizard, say): chat would break
+# until the homeserver got a new registration. WALDUR_MATRIX_ADOPT_TOKENS=true
+# overrides that, meant for a single `up`; left on, it would also overwrite the
+# next tokens changed outside compose without asking.
+if [[ "${WALDUR_MATRIX_ADOPT_TOKENS:-}" == "true" ]]; then
+	waldur init_matrix_settings --adopt
+else
+	waldur init_matrix_settings
+fi
 
 # The descriptor for registering by hand (see docs/matrix-chat-add-on.md).
 # Rendered by mastermind from the settings just seeded, so it declares the same
