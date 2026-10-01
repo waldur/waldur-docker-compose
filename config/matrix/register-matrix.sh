@@ -36,8 +36,18 @@ CALLBACK_URL="${WALDUR_MATRIX_APPSERVICE_URL:-http://waldur-mastermind-api:8080}
 # for the whole `up`. The cap is only a backstop against a homeserver that will
 # never come up; raise it rather than lowering it.
 WAIT_LIMIT="${WALDUR_MATRIX_REGISTER_WAIT_SECONDS:-3600}"
-INTERVAL=2
-waited=0
+if [[ ! "${WAIT_LIMIT}" =~ ^[0-9]+$ ]]; then
+	echo "matrix-register: WALDUR_MATRIX_REGISTER_WAIT_SECONDS must be a whole number of seconds, got '${WAIT_LIMIT}'" >&2
+	exit 1
+fi
+# Base 10 explicitly: bash reads a leading zero as octal, and "08" is not one.
+WAIT_LIMIT=$((10#${WAIT_LIMIT}))
+
+# Wall-clock time, not a count of sleeps: a probe against a homeserver that
+# accepts the connection but does not answer takes its full 5 s timeout, so
+# counting sleeps would stretch the limit several times over.
+SECONDS=0
+next_note=30
 echo "matrix-register: waiting up to ${WAIT_LIMIT}s for ${HOMESERVER} to accept requests"
 until python3 -c "
 import sys, urllib.request
@@ -46,17 +56,17 @@ try:
 except Exception:
     sys.exit(1)
 " 2>/dev/null; do
-	if (( waited >= WAIT_LIMIT )); then
+	if (( SECONDS >= WAIT_LIMIT )); then
 		echo "matrix-register: homeserver did not become reachable within ${WAIT_LIMIT}s (WALDUR_MATRIX_REGISTER_WAIT_SECONDS)" >&2
 		exit 1
 	fi
-	if (( waited > 0 && waited % 30 == 0 )); then
-		echo "matrix-register: still waiting (${waited}s) — a silent homeserver is migrating its database, not hung"
+	if (( SECONDS >= next_note )); then
+		echo "matrix-register: still waiting (${SECONDS}s) — a silent homeserver is migrating its database, not hung"
+		next_note=$((next_note + 30))
 	fi
-	sleep "${INTERVAL}"
-	waited=$((waited + INTERVAL))
+	sleep 2
 done
-echo "matrix-register: homeserver is up after ${waited}s"
+echo "matrix-register: homeserver is up after ${SECONDS}s"
 
 # Read on its own rather than sourcing the file, which also holds the tokens
 # this command takes from Constance.
