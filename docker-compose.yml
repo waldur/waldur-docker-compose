@@ -437,9 +437,10 @@ services:
       - WALDUR_MATRIX_REGISTER_WAIT_SECONDS=${WALDUR_MATRIX_REGISTER_WAIT_SECONDS:-3600}
       - WALDUR_MATRIX_APPSERVICE_URL=${WALDUR_MATRIX_APPSERVICE_URL:-http://waldur-mastermind-api:8080}
       # Only for a homeserver whose admin is not the bootstrap account (one
-      # registered by hand), to apply rotated tokens there. Passed from the
-      # shell for that one `up`, so it is never stored; empty means unused.
-      - MATRIX_ADMIN_TOKEN=${WALDUR_MATRIX_ADMIN_TOKEN:-}
+      # registered by hand), to apply rotated tokens or a changed descriptor
+      # there. Passed from the shell for that one `up`, so it is never
+      # stored; register-matrix.sh hands it on only when it is set.
+      - WALDUR_MATRIX_ADMIN_TOKEN=${WALDUR_MATRIX_ADMIN_TOKEN:-}
     # Same set as waldur-matrix-init, see the note there; the secrets volume
     # is read-only here.
     volumes:

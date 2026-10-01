@@ -74,4 +74,11 @@ SECRETS=/var/lib/waldur/matrix/secrets.env
 MATRIX_BOOTSTRAP_PASSWORD="$(sed -n 's/^BOOTSTRAP_PASSWORD=//p' "${SECRETS}")"
 export MATRIX_BOOTSTRAP_PASSWORD
 
+# Compose always defines WALDUR_MATRIX_ADMIN_TOKEN, empty unless the operator
+# passed one. Exported only when set, so an empty value can never stand in for
+# "use this admin" and the command falls back to the bootstrap account.
+if [[ -n "${WALDUR_MATRIX_ADMIN_TOKEN:-}" ]]; then
+	export MATRIX_ADMIN_TOKEN="${WALDUR_MATRIX_ADMIN_TOKEN}"
+fi
+
 waldur register_matrix_appservice --url "${CALLBACK_URL}"
