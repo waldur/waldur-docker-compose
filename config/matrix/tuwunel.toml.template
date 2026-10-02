@@ -27,6 +27,15 @@ registration_shared_secret = "@@REG_TOKEN@@"
 
 max_request_size = 104857600
 
+# Waldur's chat drawer signs in with a refresh token, so its access tokens
+# expire after 5 minutes and are renewed in the background. The refresh
+# lifetime is an idle timeout: each refresh moves it forward, and a page left
+# silent for a day (e.g. on a suspended laptop) starts a new session through
+# Waldur. Clients that sign in without a refresh token (Element with a
+# password) keep non-expiring tokens.
+access_token_ttl = 300
+refresh_token_ttl = 86400
+
 # Federation must be ON for lk-jwt-service to verify Matrix OpenID tokens
 # via /_matrix/federation/v1/openid/userinfo (used during the call
 # token exchange). Disabling federation breaks calls.
