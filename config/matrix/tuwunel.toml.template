@@ -41,6 +41,12 @@ refresh_token_ttl = 86400
 # token exchange). Disabling federation breaks calls.
 allow_federation = true
 
+# Password login for Matrix clients such as Element. Set
+# WALDUR_MATRIX_LOGIN_WITH_PASSWORD=false with single sign-on, or when users get
+# no external client at all. Waldur's chat drawer signs in through the
+# appservice and is unaffected.
+login_with_password = @@LOGIN_WITH_PASSWORD@@
+
 [global.well_known]
 client = "https://@@SERVER_NAME@@"
 server = "@@SERVER_NAME@@:443"

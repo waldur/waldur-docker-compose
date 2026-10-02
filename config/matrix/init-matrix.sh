@@ -37,6 +37,18 @@ SERVER_NAME="${WALDUR_DOMAIN:-localhost}"
 LOCALPART="${WALDUR_MATRIX_BOT_LOCALPART:-waldur-bot}"
 OPEN_REG="${WALDUR_MATRIX_OPEN_REGISTRATION:-false}"
 RTC_ENABLED="${WALDUR_MATRIX_RTC_ENABLED:-false}"
+LOGIN_WITH_PASSWORD="${WALDUR_MATRIX_LOGIN_WITH_PASSWORD:-true}"
+if [[ "${LOGIN_WITH_PASSWORD}" != "true" && "${LOGIN_WITH_PASSWORD}" != "false" ]]; then
+	echo "matrix-init: WALDUR_MATRIX_LOGIN_WITH_PASSWORD must be true or false" >&2
+	exit 1
+fi
+# Checked before anything is rendered, so a refused run leaves the previous
+# configuration in place rather than one with single sign-on dropped.
+if [[ "${WALDUR_MATRIX_SSO_ENABLED:-false}" == "true" ]]; then
+	: "${WALDUR_MATRIX_SSO_ISSUER_URL:?matrix-init: set WALDUR_MATRIX_SSO_ISSUER_URL for single sign-on}"
+	: "${WALDUR_MATRIX_SSO_CLIENT_ID:?matrix-init: set WALDUR_MATRIX_SSO_CLIENT_ID for single sign-on}"
+	: "${WALDUR_MATRIX_SSO_CLIENT_SECRET:?matrix-init: set WALDUR_MATRIX_SSO_CLIENT_SECRET for single sign-on}"
+fi
 
 if [[ "${RTC_ENABLED}" == "true" ]]; then
 	RTC_BLOCK=$'[[global.well_known.rtc_transports]]\ntype = "livekit"\nlivekit_service_url = "https://'"${SERVER_NAME}"$'/lk-jwt"'
@@ -49,11 +61,39 @@ sed \
 	-e "s|@@SERVER_NAME@@|${SERVER_NAME}|g" \
 	-e "s|@@REG_TOKEN@@|${REG_TOKEN}|g" \
 	-e "s|@@OPEN_REGISTRATION@@|${OPEN_REG}|g" \
+	-e "s|@@LOGIN_WITH_PASSWORD@@|${LOGIN_WITH_PASSWORD}|g" \
 	"${TEMPLATES}/tuwunel.toml.template" > "${SHARED}/tuwunel.toml.tmp"
 # Inject the RTC block via awk to keep multi-line replacement readable
 awk -v block="${RTC_BLOCK}" '{ gsub(/@@RTC_BLOCK@@/, block); print }' \
 	"${SHARED}/tuwunel.toml.tmp" > "${SHARED}/tuwunel.toml"
 rm -f "${SHARED}/tuwunel.toml.tmp"
+
+# Single sign-on for Matrix clients (MATRIX_EXTERNAL_LOGIN_METHOD=oidc). With
+# trusted, a claim that matches an existing account signs in to it, the one
+# Waldur provisioned, instead of registering a second one. The client secret
+# stays out of tuwunel.toml: the homeserver reads it from a file.
+SSO_SECRET_FILE="${SHARED}/sso_client_secret"
+if [[ "${WALDUR_MATRIX_SSO_ENABLED:-false}" == "true" ]]; then
+	(umask 077 && printf '%s' "${WALDUR_MATRIX_SSO_CLIENT_SECRET}" > "${SSO_SECRET_FILE}")
+	SSO_NAME="${WALDUR_MATRIX_SSO_NAME:-Single sign-on}"
+	cat >> "${SHARED}/tuwunel.toml" <<-EOF
+
+		[[global.identity_provider]]
+		brand = "${SSO_NAME}"
+		name = "${SSO_NAME}"
+		client_id = "${WALDUR_MATRIX_SSO_CLIENT_ID}"
+		client_secret_file = "/etc/waldur/matrix/sso_client_secret"
+		issuer_url = "${WALDUR_MATRIX_SSO_ISSUER_URL}"
+		callback_url = "https://${SERVER_NAME}/_matrix/client/unstable/login/sso/callback/${WALDUR_MATRIX_SSO_CLIENT_ID}"
+		userid_claims = ["${WALDUR_MATRIX_SSO_USERID_CLAIM:-sub}"]
+		trusted = true
+		unique_id_fallbacks = false
+		registration = false
+	EOF
+	echo "matrix-init: single sign-on for Matrix clients via ${WALDUR_MATRIX_SSO_ISSUER_URL}"
+else
+	rm -f "${SSO_SECRET_FILE}"
+fi
 
 # Render appservice descriptor (the YAML the operator pastes into Tuwunel's
 # admin room via `!admin appservices register`).

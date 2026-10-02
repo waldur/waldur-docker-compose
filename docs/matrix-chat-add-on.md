@@ -136,6 +136,45 @@ docker compose --profile matrix up -d
 docker compose restart tuwunel
 ```
 
+## Single sign-on for Matrix clients
+
+With Waldur's `MATRIX_EXTERNAL_LOGIN_METHOD` set to `oidc`, users sign in to
+Element or another Matrix client through the same identity provider (IdP) as
+Waldur, into the account Waldur provisioned for them. Register a client at the
+IdP with the redirect URI
+`https://<WALDUR_DOMAIN>/_matrix/client/unstable/login/sso/callback/<client id>`,
+then set in `.env`:
+
+```bash
+WALDUR_MATRIX_LOGIN_WITH_PASSWORD=false
+WALDUR_MATRIX_SSO_ENABLED=true
+WALDUR_MATRIX_SSO_NAME=Example SSO
+WALDUR_MATRIX_SSO_ISSUER_URL=https://keycloak.example.org/realms/waldur
+WALDUR_MATRIX_SSO_CLIENT_ID=matrix-homeserver
+WALDUR_MATRIX_SSO_CLIENT_SECRET=<secret>
+WALDUR_MATRIX_SSO_USERID_CLAIM=sub
+```
+
+and re-render the homeserver configuration:
+`docker compose --profile matrix up -d` then `docker compose restart tuwunel`.
+
+`waldur-matrix-init` writes the client secret to `sso_client_secret` in the
+secrets volume, not into `tuwunel.toml`, and refuses to render when SSO is on
+without an issuer, client ID or secret. The homeserver is configured so SSO
+lands in Waldur's account:
+
+- `userid_claims` is `WALDUR_MATRIX_SSO_USERID_CLAIM`, which must be the claim
+  Waldur's identity provider uses as `user_claim`, with
+  `MATRIX_USER_ID_FORMAT=username`. The claim must already be a valid Matrix
+  localpart (lowercase letters, digits, `. _ = - / +`).
+- `trusted = true` signs in to the existing account that matches the claim
+  instead of registering a second, empty one.
+- `registration = false` lets SSO sign in only to accounts Waldur provisioned.
+
+`WALDUR_MATRIX_LOGIN_WITH_PASSWORD=false` removes the password form from
+clients; Waldur's chat drawer signs in through the appservice and is
+unaffected.
+
 ## LiveKit / voice & video notes
 
 `WALDUR_LIVEKIT_NODE_IP` advertises the host's RTC media address to clients. The default `127.0.0.1` is correct for a local demo only — for any reachable deployment, set this to the host's external IP or DNS name so remote clients can connect. The RTC media ports (`WALDUR_MATRIX_RTC_TCP_PORT`/`UDP_PORT`, default 7881/7882) must also be reachable from clients.
