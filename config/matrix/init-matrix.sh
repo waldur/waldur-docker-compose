@@ -42,12 +42,66 @@ if [[ "${LOGIN_WITH_PASSWORD}" != "true" && "${LOGIN_WITH_PASSWORD}" != "false" 
 	echo "matrix-init: WALDUR_MATRIX_LOGIN_WITH_PASSWORD must be true or false" >&2
 	exit 1
 fi
+SSO_ENABLED="${WALDUR_MATRIX_SSO_ENABLED:-false}"
+if [[ "${SSO_ENABLED}" != "true" && "${SSO_ENABLED}" != "false" ]]; then
+	echo "matrix-init: WALDUR_MATRIX_SSO_ENABLED must be true or false" >&2
+	exit 1
+fi
 # Checked before anything is rendered, so a refused run leaves the previous
-# configuration in place rather than one with single sign-on dropped.
-if [[ "${WALDUR_MATRIX_SSO_ENABLED:-false}" == "true" ]]; then
+# configuration in place rather than one with single sign-on dropped. The
+# values are written into tuwunel.toml as they are, so anything that could
+# end a TOML string is refused rather than escaped.
+FORBIDDEN_USERNAMES=""
+if [[ "${SSO_ENABLED}" == "true" ]]; then
 	: "${WALDUR_MATRIX_SSO_ISSUER_URL:?matrix-init: set WALDUR_MATRIX_SSO_ISSUER_URL for single sign-on}"
 	: "${WALDUR_MATRIX_SSO_CLIENT_ID:?matrix-init: set WALDUR_MATRIX_SSO_CLIENT_ID for single sign-on}"
 	: "${WALDUR_MATRIX_SSO_CLIENT_SECRET:?matrix-init: set WALDUR_MATRIX_SSO_CLIENT_SECRET for single sign-on}"
+	SSO_NAME="${WALDUR_MATRIX_SSO_NAME:-Single sign-on}"
+	SSO_BRAND="${WALDUR_MATRIX_SSO_BRAND:-keycloak}"
+	SSO_CLAIM="${WALDUR_MATRIX_SSO_USERID_CLAIM:-sub}"
+	if [[ "${SSO_NAME}" =~ [\"\\[:cntrl:]] ]]; then
+		echo "matrix-init: WALDUR_MATRIX_SSO_NAME may not contain quotes, backslashes or control characters" >&2
+		exit 1
+	fi
+	if [[ ! "${WALDUR_MATRIX_SSO_CLIENT_ID}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+		echo "matrix-init: WALDUR_MATRIX_SSO_CLIENT_ID may contain only letters, digits, '.', '_' and '-'" >&2
+		exit 1
+	fi
+	if [[ ! "${SSO_BRAND}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+		echo "matrix-init: WALDUR_MATRIX_SSO_BRAND may contain only letters, digits, '.', '_' and '-'" >&2
+		exit 1
+	fi
+	if [[ ! "${WALDUR_MATRIX_SSO_ISSUER_URL}" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?(/[A-Za-z0-9._~%/:@=+-]*)?$ ]]; then
+		echo "matrix-init: WALDUR_MATRIX_SSO_ISSUER_URL must be an https:// URL, without query or fragment" >&2
+		exit 1
+	fi
+	# The claims Tuwunel can take a username from.
+	case "${SSO_CLAIM}" in
+	sub | preferred_username | username | nickname | email | login) ;;
+	*)
+		echo "matrix-init: WALDUR_MATRIX_SSO_USERID_CLAIM must be one of sub, preferred_username, username, nickname, email, login" >&2
+		exit 1
+		;;
+	esac
+	# A trusted provider signs in to any existing account its claim names, so
+	# the bot's account and the homeserver admin's are kept out of its reach.
+	FORBIDDEN_EXTRA="${WALDUR_MATRIX_SSO_FORBIDDEN_USERNAMES:-}"
+	if [[ ! "${LOCALPART}" =~ ^[a-z0-9._=/+-]+$ ]]; then
+		echo "matrix-init: WALDUR_MATRIX_BOT_LOCALPART must be a Matrix localpart (a-z 0-9 . _ = / + -)" >&2
+		exit 1
+	fi
+	if [[ -n "${FORBIDDEN_EXTRA}" && ! "${FORBIDDEN_EXTRA}" =~ ^[a-z0-9._=/+-]+(\ *,\ *[a-z0-9._=/+-]+)*$ ]]; then
+		echo "matrix-init: WALDUR_MATRIX_SSO_FORBIDDEN_USERNAMES must be comma-separated Matrix localparts (a-z 0-9 . _ = / + -)" >&2
+		exit 1
+	fi
+	read -ra FORBIDDEN <<<"${LOCALPART} ${FORBIDDEN_EXTRA//,/ }"
+	for name in "${FORBIDDEN[@]}"; do
+		# Anchored, since Tuwunel forbids every username a pattern occurs in;
+		# "." and "+" are regex syntax.
+		name="${name//./[.]}"
+		FORBIDDEN_USERNAMES+="${FORBIDDEN_USERNAMES:+, }\"^${name//+/[+]}\$\""
+	done
+	FORBIDDEN_USERNAMES="forbidden_usernames = [${FORBIDDEN_USERNAMES}]"
 fi
 
 if [[ "${RTC_ENABLED}" == "true" ]]; then
@@ -62,6 +116,7 @@ sed \
 	-e "s|@@REG_TOKEN@@|${REG_TOKEN}|g" \
 	-e "s|@@OPEN_REGISTRATION@@|${OPEN_REG}|g" \
 	-e "s|@@LOGIN_WITH_PASSWORD@@|${LOGIN_WITH_PASSWORD}|g" \
+	-e "s|@@FORBIDDEN_USERNAMES@@|${FORBIDDEN_USERNAMES}|g" \
 	"${TEMPLATES}/tuwunel.toml.template" > "${SHARED}/tuwunel.toml.tmp"
 # Inject the RTC block via awk to keep multi-line replacement readable
 awk -v block="${RTC_BLOCK}" '{ gsub(/@@RTC_BLOCK@@/, block); print }' \
@@ -73,19 +128,18 @@ rm -f "${SHARED}/tuwunel.toml.tmp"
 # Waldur provisioned, instead of registering a second one. The client secret
 # stays out of tuwunel.toml: the homeserver reads it from a file.
 SSO_SECRET_FILE="${SHARED}/sso_client_secret"
-if [[ "${WALDUR_MATRIX_SSO_ENABLED:-false}" == "true" ]]; then
+if [[ "${SSO_ENABLED}" == "true" ]]; then
 	(umask 077 && printf '%s' "${WALDUR_MATRIX_SSO_CLIENT_SECRET}" > "${SSO_SECRET_FILE}")
-	SSO_NAME="${WALDUR_MATRIX_SSO_NAME:-Single sign-on}"
 	cat >> "${SHARED}/tuwunel.toml" <<-EOF
 
 		[[global.identity_provider]]
-		brand = "${SSO_NAME}"
+		brand = "${SSO_BRAND}"
 		name = "${SSO_NAME}"
 		client_id = "${WALDUR_MATRIX_SSO_CLIENT_ID}"
 		client_secret_file = "/etc/waldur/matrix/sso_client_secret"
 		issuer_url = "${WALDUR_MATRIX_SSO_ISSUER_URL}"
 		callback_url = "https://${SERVER_NAME}/_matrix/client/unstable/login/sso/callback/${WALDUR_MATRIX_SSO_CLIENT_ID}"
-		userid_claims = ["${WALDUR_MATRIX_SSO_USERID_CLAIM:-sub}"]
+		userid_claims = ["${SSO_CLAIM}"]
 		trusted = true
 		unique_id_fallbacks = false
 		registration = false
