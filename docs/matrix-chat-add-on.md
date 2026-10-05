@@ -20,6 +20,8 @@ docker compose --profile matrix --profile matrix-rtc up -d
 
 The `matrix-rtc` profile requires `matrix` because `lk-jwt-service` shares Tuwunel's network namespace. Activating it on its own will fail.
 
+The add-on runs `waldur init_matrix_settings` and `waldur register_matrix_appservice` from the mastermind image, so it needs `WALDUR_MASTERMIND_IMAGE_TAG` at the version `.env.example` pins or newer. With an older image `waldur-matrix-init` fails on the unknown command and Tuwunel never starts.
+
 ## Pinned image tags
 
 Matrix component versions live in `.env`. Bump them deliberately:

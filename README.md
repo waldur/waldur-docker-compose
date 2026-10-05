@@ -62,6 +62,10 @@ setup, so make sure you understand what you are doing.
 
 ## Upgrading Waldur
 
+Your `.env` keeps the image tags it was copied with. First set
+`WALDUR_MASTERMIND_IMAGE_TAG` and `WALDUR_HOMEPORT_IMAGE_TAG` to the versions
+`.env.example` pins: the files of a release expect the images of that release.
+
 ```bash
 docker compose pull
 docker compose down
