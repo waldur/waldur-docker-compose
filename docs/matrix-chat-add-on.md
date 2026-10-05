@@ -62,7 +62,9 @@ the whole chat corpus. Changing the domain means a fresh homeserver.
 
 ## Appservice registration
 
-Tuwunel does not load appservice descriptors from a file — it requires registration via the `!admin appservices register` admin-room command. This is handled for you: the one-shot `waldur-matrix-register` container runs after the homeserver comes up, registers a bootstrap admin user, `@waldur-bootstrap`, with the generated registration token and `BOOTSTRAP_PASSWORD` from the secrets volume, and drives that admin-room command with the descriptor. There is nothing to paste.
+Tuwunel does not load appservice descriptors from a file — it requires registration via the `!admin appservices register` admin-room command. This is handled for you: the one-shot `waldur-matrix-register` container runs after the homeserver comes up and drives that admin-room command with the descriptor. There is nothing to paste.
+
+On a new homeserver it first creates a bootstrap admin, `@waldur-bootstrap`, through Tuwunel's shared-secret registration API on the internal network. The generated registration token is the shared secret, and `BOOTSTRAP_PASSWORD` from the secrets volume becomes the account's password. Later runs sign in as `@waldur-bootstrap` with that password, and every run signs the bootstrap session out when it is done.
 
 ```bash
 docker compose --profile matrix up -d
