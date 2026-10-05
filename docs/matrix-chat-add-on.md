@@ -140,8 +140,14 @@ docker compose restart tuwunel
 
 With Waldur's `MATRIX_EXTERNAL_LOGIN_METHOD` set to `oidc`, users sign in to
 Element or another Matrix client through the same identity provider (IdP) as
-Waldur, into the account Waldur provisioned for them. Register a client at the
-IdP with the redirect URI
+Waldur, into the account Waldur provisioned for them.
+[Single sign-on for Matrix clients](https://docs.waldur.com/latest/developer-guide/admin-guide/matrix-sso/)
+explains how the accounts line up and why the homeserver is configured this
+way; this section covers the compose settings.
+
+Set the method under **Administration → Configuration → Matrix chat →
+Settings**; compose does not seed it. Register a client at the IdP with the
+redirect URI
 `https://<WALDUR_DOMAIN>/_matrix/client/unstable/login/sso/callback/<client id>`,
 then set in `.env`:
 
@@ -191,9 +197,7 @@ The homeserver is configured so SSO lands in Waldur's account:
 - `trusted = true` signs in to the existing account that matches the claim.
   Without it, Tuwunel refuses the login: it signs in only to accounts it
   created through SSO, and Waldur provisioned these. That is *any* existing
-  account with that name, so keep `sub` unless the IdP controls usernames. On
-  many IdPs users can change their own `preferred_username` or `email`, and a
-  user who renames themselves after an existing account signs in to it.
+  account with that name, so keep `sub` unless the IdP controls usernames.
 - `registration = false`: SSO creates no accounts and only signs in to
   existing ones, with `trusted` any whose name matches the claim, hence
   `forbidden_usernames`.
@@ -205,9 +209,7 @@ The homeserver is configured so SSO lands in Waldur's account:
   `WALDUR_MATRIX_SSO_FORBIDDEN_USERNAMES` (comma-separated). Admins on the list
   can still be created through the shared-secret registration API; SSO cannot
   sign in to them. Tuwunel logs a warning at startup for each existing
-  account on the list; that is expected. The list also closes registration,
-  which the bot does not need: `!admin appservices register` creates it, and
-  Waldur skips registering a bot that exists.
+  account on the list; that is expected.
 
 `WALDUR_MATRIX_LOGIN_WITH_PASSWORD=false` removes the password form from
 clients; Waldur's chat drawer signs in through the appservice and is
