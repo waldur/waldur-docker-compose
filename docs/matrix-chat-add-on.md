@@ -230,8 +230,8 @@ section, run with `HOMESERVER=https://<WALDUR_DOMAIN>` and `TOKEN=<token>`. With
 `TLS=internal`, whose certificate Python does not trust, run it inside the
 compose network instead: feed the script to
 `docker exec -i -e HOMESERVER=http://tuwunel.internal:6167 -e TOKEN=<token> waldur-mastermind-worker python3 -`.
-That also signs the token out, and nobody, single sign-on included, can sign in
-to the account again.
+That also signs it out, and nobody can sign in to the account again, not even
+through single sign-on.
 
 ## Password mode for Matrix clients
 
