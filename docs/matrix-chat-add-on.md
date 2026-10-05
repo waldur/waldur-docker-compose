@@ -183,10 +183,11 @@ The homeserver is configured so SSO lands in Waldur's account:
 - `userid_claims` is `WALDUR_MATRIX_SSO_USERID_CLAIM`, one of `sub`,
   `preferred_username`, `username`, `nickname`, `email` (its local part) or
   `login` (GitHub). It must be the claim Waldur's identity provider uses as
-  `user_claim`, with `MATRIX_USER_ID_FORMAT=username`, and its values must
-  already be valid Matrix localparts (lowercase letters, digits,
-  `. _ = - / +`). Users with a `+` whom Waldur provisioned before it kept `+`
-  in localparts still have `_` instead, so SSO cannot reach their account.
+  `user_claim`, with that provider's `user_field` left at `username` and
+  `MATRIX_USER_ID_FORMAT=username`, and its values must already be valid
+  Matrix localparts (lowercase letters, digits, `. _ = - / +`). Users with a
+  `+` whom Waldur provisioned before it kept `+` in localparts still have `_`
+  instead, so SSO cannot reach their account.
 - `trusted = true` signs in to the existing account that matches the claim.
   Without it, Tuwunel refuses the login: it signs in only to accounts it
   created through SSO, and Waldur provisioned these. That is *any* existing
