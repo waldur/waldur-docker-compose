@@ -84,15 +84,8 @@ restart `tuwunel`.
 
 Re-running `up -d` is safe. The command first checks whether the appservice token already works and exits early when it does, so an already-configured stack is a no-op rather than a failed container.
 
-A stack registered by hand before this container existed can keep it switched
-on, and registration keeps working: the register container finds the appservice
-live and exits 0. What it cannot do there is change the registration. The
-bootstrap account earns its admin rights by being the homeserver's first
-account, and on that stack the first account is someone else's, so the
-container logs a warning instead of applying a changed descriptor, and rotating
-tokens takes that admin's access token (see Stacks registered by hand under
-Token rotation). Set `WALDUR_MATRIX_REGISTER_APPSERVICE=false` to keep
-registration entirely manual, as below.
+Set `WALDUR_MATRIX_REGISTER_APPSERVICE=false` to keep registration entirely
+manual, as below.
 
 ### Registering by hand
 
@@ -190,67 +183,6 @@ Do not delete the secrets volume to rotate: that also replaces `BOOTSTRAP_PASSWO
 which then no longer matches `@waldur-bootstrap` on the homeserver, and
 registration fails.
 
-### Stacks registered by hand
-
-A stack set up before the bootstrap password existed, typically one registered
-by hand, upgrades without extra steps. `waldur-matrix-init` seeds the same
-tokens from `secrets.env`, records that compose now manages them and adds a
-`BOOTSTRAP_PASSWORD` (it logs that), and registration keeps working. The
-exception is a stack whose tokens were changed after setup; see Tokens changed
-outside compose below.
-
-Its homeserver admin is still not `@waldur-bootstrap`, so the register
-container has no admin access there. While the appservice token works, it logs
-a warning about that and exits 0. Rotating tokens, or applying a changed
-descriptor, needs the access token of that existing homeserver admin for the
-`up` that applies the change. For a rotation, edit `secrets.env` as above
-first, then:
-
-```bash
-WALDUR_MATRIX_ADMIN_TOKEN=<admin access token> docker compose --profile matrix up -d
-docker wait waldur-matrix-register
-docker logs waldur-matrix-register
-```
-
-`register_matrix_appservice` uses that admin to unregister the old registration
-and register the new one. The token comes from your shell for that one command;
-do not keep it in `.env`. Without it, a rotation fails the register container,
-and chat stays down until you run the command above.
-
-Registering the descriptor again by hand does not rotate on its own: unregister
-first, as described under Registering by hand.
-
-### Tokens changed outside compose
-
-`waldur-matrix-init` refuses to overwrite appservice tokens in Constance that
-differ from the ones in `secrets.env` and that no deployment seeded, for example
-tokens rotated in the Setup wizard. Seeding over them would break chat until the
-homeserver got a new registration, so init fails and logs why. Until you
-resolve it, `waldur-matrix-init` fails on every `up` and Tuwunel does not start;
-read `docker logs waldur-matrix-init`. Either keep Waldur's tokens or replace
-them with the ones in `secrets.env`.
-
-**To keep the tokens Waldur holds**, read them with `waldur shell` as under
-Verifying the add-on, write them into `secrets.env` as `AS_TOKEN` and `HS_TOKEN`
-the way the rotation command above edits that file, and `up` again. Init then
-finds them equal and seeds as usual, and the register container registers them
-if the homeserver does not have them yet.
-
-**To replace them with the ones in `secrets.env`**, adopt them for one `up`.
-Init seeds them over Waldur's, and the register container then replaces the
-homeserver's registration with them:
-
-```bash
-WALDUR_MATRIX_ADOPT_TOKENS=true docker compose --profile matrix up -d
-docker wait waldur-matrix-register
-docker logs waldur-matrix-register
-```
-
-On a stack registered by hand, pass `WALDUR_MATRIX_ADMIN_TOKEN` in the same
-command, as above. Set `WALDUR_MATRIX_ADOPT_TOKENS` for that one command only,
-and unset it again if you exported it or put it in `.env`: left set, every later
-`up` would overwrite tokens changed outside compose without asking.
-
 ## LiveKit / voice & video notes
 
 `WALDUR_LIVEKIT_NODE_IP` advertises the host's RTC media address to clients. The default `127.0.0.1` is correct for a local demo only — for any reachable deployment, set this to the host's external IP or DNS name so remote clients can connect. The RTC media ports (`WALDUR_MATRIX_RTC_TCP_PORT`/`UDP_PORT`, default 7881/7882) must also be reachable from clients.
@@ -309,6 +241,7 @@ Until the appservice is registered, room creation fails with `M_UNKNOWN_TOKEN` i
 
 ## Troubleshooting
 
+- **`waldur-matrix-init` fails and Tuwunel does not start**: read `docker logs waldur-matrix-init`. `init_matrix_settings` refuses appservice tokens in Constance that no deployment seeded, for example from an earlier run of the Setup wizard, and writes nothing. Clear those settings, or start from a fresh stack.
 - **`M_UNKNOWN_TOKEN` in worker logs after a token rotation**: the homeserver still holds the registration with the old tokens. Check `docker logs waldur-matrix-register` and see Token rotation. Registering the descriptor again by hand does not fix it on its own: Tuwunel keeps the old tokens for an id it already has, so unregister first.
 - **Webhook `DisallowedHost` errors**: the appservice descriptor is rendered with `url: http://waldur-mastermind-api:8080` (the Compose service name), which is in `ALLOWED_HOSTS` for the dockerised settings. If you change the URL — for example to call back via an external hostname — patch `ALLOWED_HOSTS` in `config/waldur-mastermind/override.conf.py`.
 - **Browser chat drawer fails to connect**: the backend talks to Tuwunel internally at `http://tuwunel.internal:6167` (Docker DNS); the browser must reach Tuwunel through Caddy at `https://${WALDUR_DOMAIN}`. `waldur-matrix-init` seeds both — backend uses `MATRIX_HOMESERVER_URL`, browser-facing endpoints serve `MATRIX_HOMESERVER_PUBLIC_URL` (requires `waldur-mastermind` >= 8.x with the dual-URL split). If the chat drawer logs CSP errors connecting to `tuwunel.internal`, verify `MATRIX_HOMESERVER_PUBLIC_URL` is set: `docker exec waldur-mastermind-worker waldur shell -c "from constance import config; print(config.MATRIX_HOMESERVER_PUBLIC_URL)"`.

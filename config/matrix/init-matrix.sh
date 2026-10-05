@@ -34,18 +34,6 @@ if [[ ! -f "${SECRETS}" ]]; then
 	echo "matrix-init: generated fresh AS/HS/registration tokens and bootstrap password"
 else
 	echo "matrix-init: reusing existing tokens from ${SECRETS}"
-	if ! grep -q '^BOOTSTRAP_PASSWORD=' "${SECRETS}"; then
-		# A stack set up before the bootstrap password existed. The register
-		# command expects one on every stack, so add it. It does not make
-		# rotation automatic here: this homeserver's admin was created some
-		# other way, so rotating tokens or applying a changed descriptor still
-		# needs that admin's access token.
-		if [[ -s "${SECRETS}" && -n "$(tail -c 1 "${SECRETS}")" ]]; then
-			echo >> "${SECRETS}"
-		fi
-		echo "BOOTSTRAP_PASSWORD=$(openssl rand -hex 32)" >> "${SECRETS}"
-		echo "matrix-init: added BOOTSTRAP_PASSWORD to ${SECRETS}. This stack predates it, so its homeserver admin does not use it: registration keeps working, but rotating tokens or applying a changed descriptor needs that admin's access token (WALDUR_MATRIX_ADMIN_TOKEN), see \"Stacks registered by hand\" in docs/matrix-chat-add-on.md"
-	fi
 fi
 
 # shellcheck disable=SC1090
@@ -105,16 +93,7 @@ export MATRIX_APPSERVICE_HS_TOKEN="${HS_TOKEN}"
 export MATRIX_APPSERVICE_SENDER_LOCALPART="${LOCALPART}"
 export MATRIX_USER_REGISTRATION_SECRET="${REG_TOKEN}"
 
-# The command refuses to overwrite appservice tokens that differ from these and
-# that no deployment seeded (rotated in the Setup wizard, say): chat would break
-# until the homeserver got a new registration. WALDUR_MATRIX_ADOPT_TOKENS=true
-# overrides that, meant for a single `up`; left on, it would also overwrite the
-# next tokens changed outside compose without asking.
-if [[ "${WALDUR_MATRIX_ADOPT_TOKENS:-}" == "true" ]]; then
-	waldur init_matrix_settings --adopt
-else
-	waldur init_matrix_settings
-fi
+waldur init_matrix_settings
 
 # The descriptor for registering by hand (see docs/matrix-chat-add-on.md).
 # Rendered by mastermind from the settings just seeded, so it declares the same

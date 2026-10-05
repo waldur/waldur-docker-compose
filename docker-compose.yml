@@ -377,9 +377,6 @@ services:
       - WALDUR_MATRIX_OPEN_REGISTRATION=${WALDUR_MATRIX_OPEN_REGISTRATION:-false}
       - WALDUR_MATRIX_RTC_ENABLED=${WALDUR_MATRIX_RTC_ENABLED:-false}
       - WALDUR_MATRIX_APPSERVICE_URL=${WALDUR_MATRIX_APPSERVICE_URL:-http://waldur-mastermind-api:8080}
-      # "true" for one `up` to replace appservice tokens changed outside
-      # compose with the ones in the secrets volume; see init-matrix.sh.
-      - WALDUR_MATRIX_ADOPT_TOKENS=${WALDUR_MATRIX_ADOPT_TOKENS:-}
     # Same set as *default-mastermind-volumes (a YAML sequence anchor
     # cannot be merged with extra items), plus the matrix bind mount and
     # the shared secrets volume.
