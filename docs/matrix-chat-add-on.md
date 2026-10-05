@@ -172,8 +172,9 @@ docker logs waldur-matrix-register
 ```
 
 `waldur-matrix-init` seeds the new tokens into Constance, and
-`waldur-matrix-register` logs in as `@waldur-bootstrap`, unregisters the old
-registration and registers the new one. Tuwunel does not replace a registration
+`waldur-matrix-register` signs in with `WALDUR_MATRIX_ADMIN_TOKEN` if you pass
+one, and as `@waldur-bootstrap` otherwise, unregisters the old registration and
+registers the new one. Tuwunel does not replace a registration
 that is registered again under the same id, which is why the old one is removed
 first. The container fails if the homeserver still rejects the new token.
 
@@ -185,6 +186,41 @@ is untouched, so existing rooms survive.
 Do not delete the secrets volume to rotate: that also replaces `BOOTSTRAP_PASSWORD`,
 which then no longer matches `@waldur-bootstrap` on the homeserver, and
 registration fails.
+
+**With password login off** (`WALDUR_MATRIX_LOGIN_WITH_PASSWORD=false`, as with
+single sign-on), the bootstrap admin cannot sign in. A rotation then fails
+after init has seeded the new tokens, and an `up` that finds a changed
+registration only warns instead of replacing it. Pass a homeserver admin's
+access token for that one `up`, from the shell rather than `.env`:
+
+```bash
+WALDUR_MATRIX_ADMIN_TOKEN=<token> docker compose --profile matrix up -d
+```
+
+To get one, register a temporary admin through the shared-secret API from
+inside the compose network; Waldur holds the registration token, and this
+prints the admin's access token:
+
+```bash
+docker exec waldur-mastermind-worker waldur shell -c '
+import hashlib, hmac, secrets, httpx
+from constance import config
+user, password = "rotation-" + secrets.token_hex(4), secrets.token_hex(32)
+homeserver = httpx.Client(base_url=config.MATRIX_HOMESERVER_URL)
+nonce = homeserver.get("/_synapse/admin/v1/register").json()["nonce"]
+mac = hmac.new(config.MATRIX_USER_REGISTRATION_SECRET.encode(),
+               "\0".join([nonce, user, password, "admin"]).encode(), hashlib.sha1)
+print(homeserver.post("/_synapse/admin/v1/register", json={
+    "nonce": nonce, "username": user, "password": password,
+    "admin": True, "mac": mac.hexdigest()}).json()["access_token"])
+'
+```
+
+Afterwards, sign that token out:
+
+```bash
+curl -k -X POST -H "Authorization: Bearer <token>" https://<WALDUR_DOMAIN>/_matrix/client/v3/logout
+```
 
 ## Password mode for Matrix clients
 
