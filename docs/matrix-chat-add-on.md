@@ -187,11 +187,13 @@ Do not delete the secrets volume to rotate: that also replaces `BOOTSTRAP_PASSWO
 which then no longer matches `@waldur-bootstrap` on the homeserver, and
 registration fails.
 
-**With password login off** (`WALDUR_MATRIX_LOGIN_WITH_PASSWORD=false`, as with
-single sign-on), the bootstrap admin cannot sign in. A rotation then fails
-after init has seeded the new tokens, and an `up` that finds a changed
-registration only warns instead of replacing it. Pass a homeserver admin's
-access token for that one `up`, from the shell rather than `.env`:
+### Rotating with password login off
+
+With `WALDUR_MATRIX_LOGIN_WITH_PASSWORD=false`, as with single sign-on, the
+bootstrap admin cannot sign in. A rotation then fails after init has seeded
+the new tokens, and an `up` that finds a changed registration only warns
+instead of replacing it. Pass a homeserver admin's access token for that one
+`up`, from the shell rather than `.env`:
 
 ```bash
 WALDUR_MATRIX_ADMIN_TOKEN=<token> docker compose --profile matrix up -d
