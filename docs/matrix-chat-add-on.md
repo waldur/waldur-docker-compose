@@ -194,10 +194,10 @@ The homeserver is configured so SSO lands in Waldur's account:
   Matrix localparts (lowercase letters, digits, `. _ = - / +`). Users with a
   `+` whom Waldur provisioned before it kept `+` in localparts still have `_`
   instead, so SSO cannot reach their account.
-- `trusted = true` signs in to the existing account that matches the claim.
-  Without it, Tuwunel refuses the login: it signs in only to accounts it
-  created through SSO, and Waldur provisioned these. That is *any* existing
-  account with that name, so keep `sub` unless the IdP controls usernames.
+- `trusted = true` signs in to the existing account that matches the claim, and
+  that is *any* existing account with that name, so keep `sub` unless the IdP
+  controls usernames. Without it, Tuwunel refuses the login: it signs in only
+  to accounts it created through SSO, and Waldur provisioned these.
 - `registration = false`: SSO creates no accounts and only signs in to
   existing ones, with `trusted` any whose name matches the claim, hence
   `forbidden_usernames`.
