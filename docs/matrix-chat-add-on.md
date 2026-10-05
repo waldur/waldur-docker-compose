@@ -138,10 +138,10 @@ docker compose restart tuwunel
 
 ## Single sign-on for Matrix clients
 
-With Waldur's `MATRIX_EXTERNAL_LOGIN_METHOD` set to `oidc` (a setting added by
-waldur/waldur-mastermind!6484), users sign in to Element or another Matrix
-client through the same identity provider (IdP) as Waldur, into the account
-Waldur provisioned for them. Register a client at the IdP with the redirect URI
+With Waldur's `MATRIX_EXTERNAL_LOGIN_METHOD` set to `oidc`, users sign in to
+Element or another Matrix client through the same identity provider (IdP) as
+Waldur, into the account Waldur provisioned for them. Register a client at the
+IdP with the redirect URI
 `https://<WALDUR_DOMAIN>/_matrix/client/unstable/login/sso/callback/<client id>`,
 then set in `.env`:
 
@@ -184,15 +184,18 @@ The homeserver is configured so SSO lands in Waldur's account:
   `preferred_username`, `username`, `nickname`, `email` (its local part) or
   `login` (GitHub). It must be the claim Waldur's identity provider uses as
   `user_claim`, with `MATRIX_USER_ID_FORMAT=username`, and its values must
-  already be valid Matrix localparts (lowercase letters, digits, `. _ = - /`).
-  A `+` works only with a Waldur that keeps it in localparts
-  (waldur/waldur-mastermind!6497).
-- `trusted = true` signs in to the existing account that matches the claim
-  instead of registering a second, empty one. That is *any* existing account
-  with that name, so keep `sub` unless the IdP controls usernames. On many IdPs
-  users can change their own `preferred_username` or `email`, and a user who
-  renames themselves after an existing account signs in to it.
-- `registration = false` lets SSO sign in only to accounts Waldur provisioned.
+  already be valid Matrix localparts (lowercase letters, digits,
+  `. _ = - / +`). Users with a `+` whom Waldur provisioned before it kept `+`
+  in localparts still have `_` instead, so SSO cannot reach their account.
+- `trusted = true` signs in to the existing account that matches the claim.
+  Without it, Tuwunel refuses the login: it signs in only to accounts it
+  created through SSO, and Waldur provisioned these. That is *any* existing
+  account with that name, so keep `sub` unless the IdP controls usernames. On
+  many IdPs users can change their own `preferred_username` or `email`, and a
+  user who renames themselves after an existing account signs in to it.
+- `registration = false`: SSO creates no accounts and only signs in to
+  existing ones, with `trusted` any whose name matches the claim, hence
+  `forbidden_usernames`.
 - `forbidden_usernames` closes accounts that are not a Waldur user's to SSO.
   The bot's localpart (`WALDUR_MATRIX_BOT_LOCALPART`) and `waldur-bootstrap`,
   reserved for the bootstrap admin that automatic registration will create,
@@ -203,8 +206,7 @@ The homeserver is configured so SSO lands in Waldur's account:
   sign in to them. Tuwunel logs a warning at startup for each existing
   account on the list; that is expected. The list also closes registration,
   which the bot does not need: `!admin appservices register` creates it, and
-  Waldur skips registering a bot that exists (waldur/waldur-mastermind!6497;
-  an older Waldur fails to set up the bot with `Username is forbidden`).
+  Waldur skips registering a bot that exists.
 
 `WALDUR_MATRIX_LOGIN_WITH_PASSWORD=false` removes the password form from
 clients; Waldur's chat drawer signs in through the appservice and is
