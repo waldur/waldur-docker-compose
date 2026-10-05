@@ -236,8 +236,9 @@ Matrix chat → Settings**, and keep `WALDUR_MATRIX_LOGIN_WITH_PASSWORD=true`.
 Waldur sets the passwords through the homeserver's admin API, so the bot has to
 be a homeserver admin; see
 [Making the bot a homeserver admin](https://docs.waldur.com/latest/developer-guide/admin-guide/matrix-appservice-setup/#making-the-bot-a-homeserver-admin)
-for what that costs. On compose, sign in to Element at `https://<WALDUR_DOMAIN>`
-as `@waldur-bootstrap:<WALDUR_DOMAIN>` with the bootstrap password:
+for what that costs. On compose, sign in to a Matrix client such as Element,
+with the homeserver `https://<WALDUR_DOMAIN>`, as
+`@waldur-bootstrap:<WALDUR_DOMAIN>` with the bootstrap password:
 
 ```bash
 docker compose --profile matrix run --rm --no-deps -T --entrypoint sed \
