@@ -223,14 +223,15 @@ print(user, homeserver.post("/_synapse/admin/v1/register", json={
 '
 ```
 
-Afterwards, sign that token out:
-
-```bash
-curl -k -X POST -H "Authorization: Bearer <token>" https://<WALDUR_DOMAIN>/_matrix/client/v3/logout
-```
-
-The account stays a homeserver admin with a password nobody knows. With single
-sign-on, add it to `WALDUR_MATRIX_SSO_FORBIDDEN_USERNAMES` like any other admin.
+Afterwards, have the temporary admin deactivate itself in the admin room, with
+the deactivate step under the same
+[Token rotation](https://docs.waldur.com/latest/developer-guide/admin-guide/matrix-appservice-setup/#token-rotation)
+section, run with `HOMESERVER=https://<WALDUR_DOMAIN>` and `TOKEN=<token>`. With
+`TLS=internal`, whose certificate Python does not trust, run it inside the
+compose network instead: feed the script to
+`docker exec -i -e HOMESERVER=http://tuwunel.internal:6167 -e TOKEN=<token> waldur-mastermind-worker python3 -`.
+That also signs the token out, and nobody, single sign-on included, can sign in
+to the account again.
 
 ## Password mode for Matrix clients
 
