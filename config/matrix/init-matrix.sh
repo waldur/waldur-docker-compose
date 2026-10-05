@@ -84,7 +84,8 @@ if [[ "${SSO_ENABLED}" == "true" ]]; then
 		;;
 	esac
 	# A trusted provider signs in to any existing account its claim names, so
-	# the bot's account and the homeserver admin's are kept out of its reach.
+	# the bot's account, the bootstrap admin Waldur creates on a new homeserver
+	# (waldur-bootstrap) and any other admin are kept out of its reach.
 	FORBIDDEN_EXTRA="${WALDUR_MATRIX_SSO_FORBIDDEN_USERNAMES:-}"
 	if [[ ! "${LOCALPART}" =~ ^[a-z0-9._=/+-]+$ ]]; then
 		echo "matrix-init: WALDUR_MATRIX_BOT_LOCALPART must be a Matrix localpart (a-z 0-9 . _ = / + -)" >&2
@@ -94,7 +95,7 @@ if [[ "${SSO_ENABLED}" == "true" ]]; then
 		echo "matrix-init: WALDUR_MATRIX_SSO_FORBIDDEN_USERNAMES must be comma-separated Matrix localparts (a-z 0-9 . _ = / + -)" >&2
 		exit 1
 	fi
-	read -ra FORBIDDEN <<<"${LOCALPART} ${FORBIDDEN_EXTRA//,/ }"
+	read -ra FORBIDDEN <<<"${LOCALPART} waldur-bootstrap ${FORBIDDEN_EXTRA//,/ }"
 	for name in "${FORBIDDEN[@]}"; do
 		# Anchored, since Tuwunel forbids every username a pattern occurs in;
 		# "." and "+" are regex syntax.
