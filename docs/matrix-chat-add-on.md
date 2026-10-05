@@ -186,6 +186,29 @@ Do not delete the secrets volume to rotate: that also replaces `BOOTSTRAP_PASSWO
 which then no longer matches `@waldur-bootstrap` on the homeserver, and
 registration fails.
 
+## Password mode for Matrix clients
+
+With `MATRIX_EXTERNAL_LOGIN_METHOD` set to `password`, users generate a Matrix
+password in Waldur and sign in to Element with it. It is meant for testing and
+sites without an identity provider; production uses single sign-on. Compose
+does not seed the method: set it under **Administration → Configuration →
+Matrix chat → Settings**, and keep `WALDUR_MATRIX_LOGIN_WITH_PASSWORD=true`.
+
+Waldur sets the passwords through the homeserver's admin API, so the bot has to
+be a homeserver admin; see
+[Making the bot a homeserver admin](https://docs.waldur.com/latest/developer-guide/admin-guide/matrix-appservice-setup/#making-the-bot-a-homeserver-admin)
+for what that costs. On compose, sign in to Element at `https://<WALDUR_DOMAIN>`
+as `@waldur-bootstrap:<WALDUR_DOMAIN>` with the bootstrap password:
+
+```bash
+docker compose --profile matrix run --rm --no-deps -T --entrypoint sed \
+  waldur-matrix-init-volume -n 's/^BOOTSTRAP_PASSWORD=//p' /var/lib/waldur/matrix/secrets.env
+```
+
+In the `#admins:<WALDUR_DOMAIN>` room, send
+`!admin users make-user-admin @<WALDUR_MATRIX_BOT_LOCALPART>:<WALDUR_DOMAIN>`,
+then sign out.
+
 ## LiveKit / voice & video notes
 
 `WALDUR_LIVEKIT_NODE_IP` advertises the host's RTC media address to clients. The default `127.0.0.1` is correct for a local demo only — for any reachable deployment, set this to the host's external IP or DNS name so remote clients can connect. The RTC media ports (`WALDUR_MATRIX_RTC_TCP_PORT`/`UDP_PORT`, default 7881/7882) must also be reachable from clients.
