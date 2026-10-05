@@ -231,7 +231,8 @@ section, run with `HOMESERVER=https://<WALDUR_DOMAIN>` and `TOKEN=<token>`. With
 compose network instead: feed the script to
 `docker exec -i -e HOMESERVER=http://tuwunel.internal:6167 -e TOKEN=<token> waldur-mastermind-worker python3 -`.
 That also signs it out, and nobody can sign in to the account again, not even
-through single sign-on.
+through single sign-on. The step exits non-zero if the temporary admin is still
+active; then deactivate it from `#admins` by hand.
 
 ## Password mode for Matrix clients
 
