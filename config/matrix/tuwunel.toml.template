@@ -47,10 +47,10 @@ allow_federation = true
 # appservice and is unaffected.
 login_with_password = @@LOGIN_WITH_PASSWORD@@
 
-# Single sign-on only: the bot's localpart, Waldur's bootstrap admin
-# (waldur-bootstrap) and WALDUR_MATRIX_SSO_FORBIDDEN_USERNAMES, which no
-# identity provider account may sign in to or register. Empty without single
-# sign-on.
+# Single sign-on only: the bot's localpart, waldur-bootstrap (reserved for the
+# bootstrap admin that automatic registration will create) and
+# WALDUR_MATRIX_SSO_FORBIDDEN_USERNAMES, which no identity provider account may
+# sign in to or register. Empty without single sign-on.
 @@FORBIDDEN_USERNAMES@@
 
 [global.well_known]

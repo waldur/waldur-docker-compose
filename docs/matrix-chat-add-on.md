@@ -194,12 +194,13 @@ The homeserver is configured so SSO lands in Waldur's account:
   renames themselves after an existing account signs in to it.
 - `registration = false` lets SSO sign in only to accounts Waldur provisioned.
 - `forbidden_usernames` closes accounts that are not a Waldur user's to SSO.
-  The bot's (`WALDUR_MATRIX_BOT_LOCALPART`) and Waldur's bootstrap admin
-  (`waldur-bootstrap`) are on it automatically. Create any other homeserver
-  admin under a localpart no IdP user can hold, such as `matrix-admin`, and
-  list it in `WALDUR_MATRIX_SSO_FORBIDDEN_USERNAMES` (comma-separated). Admins
-  created through the shared-secret registration API are not affected by the
-  list. Tuwunel logs a warning at startup for each existing
+  The bot's localpart (`WALDUR_MATRIX_BOT_LOCALPART`) and `waldur-bootstrap`,
+  reserved for the bootstrap admin that automatic registration will create,
+  are on it automatically. Create any other homeserver admin under a localpart
+  no IdP user can hold, such as `matrix-admin`, and list it in
+  `WALDUR_MATRIX_SSO_FORBIDDEN_USERNAMES` (comma-separated). Admins on the list
+  can still be created through the shared-secret registration API; SSO cannot
+  sign in to them. Tuwunel logs a warning at startup for each existing
   account on the list; that is expected. The list also closes registration,
   which the bot does not need: `!admin appservices register` creates it, and
   Waldur skips registering a bot that exists (waldur/waldur-mastermind!6497;

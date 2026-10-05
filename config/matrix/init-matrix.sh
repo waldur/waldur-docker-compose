@@ -84,8 +84,9 @@ if [[ "${SSO_ENABLED}" == "true" ]]; then
 		;;
 	esac
 	# A trusted provider signs in to any existing account its claim names, so
-	# the bot's account, the bootstrap admin Waldur creates on a new homeserver
-	# (waldur-bootstrap) and any other admin are kept out of its reach.
+	# the bot's account, waldur-bootstrap (reserved for the bootstrap admin that
+	# automatic registration will create) and any other admin are kept out of
+	# its reach.
 	FORBIDDEN_EXTRA="${WALDUR_MATRIX_SSO_FORBIDDEN_USERNAMES:-}"
 	if [[ ! "${LOCALPART}" =~ ^[a-z0-9._=/+-]+$ ]]; then
 		echo "matrix-init: WALDUR_MATRIX_BOT_LOCALPART must be a Matrix localpart (a-z 0-9 . _ = / + -)" >&2
