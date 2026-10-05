@@ -12,8 +12,10 @@ port = [6167]
 
 # Registration is ENABLED but gated by registration_token below — a random user
 # cannot self-register without it. Waldur provisions users through that token
-# (the m.login.registration_token flow), which is also the only path that sets a
-# usable password on Tuwunel, so this must stay true for password login to work.
+# (the m.login.registration_token flow), so this must stay true. The accounts it
+# creates get no password: in password mode the bot sets a generated one through
+# the admin API, which needs the bot to be a homeserver admin
+# (!admin users make-user-admin).
 #
 # WALDUR_MATRIX_OPEN_REGISTRATION drops the token requirement entirely (the flag
 # below), making the server openly abusable. Keep it false unless you mean it.
