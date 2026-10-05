@@ -199,7 +199,7 @@ WALDUR_MATRIX_ADMIN_TOKEN=<token> docker compose --profile matrix up -d
 
 To get one, register a temporary admin through the shared-secret API from
 inside the compose network; Waldur holds the registration token, and this
-prints the admin's access token:
+prints the account and its access token:
 
 ```bash
 docker exec waldur-mastermind-worker waldur shell -c '
@@ -207,12 +207,12 @@ import hashlib, hmac, secrets, httpx
 from constance import config
 user, password = "rotation-" + secrets.token_hex(4), secrets.token_hex(32)
 homeserver = httpx.Client(base_url=config.MATRIX_HOMESERVER_URL)
-nonce = homeserver.get("/_synapse/admin/v1/register").json()["nonce"]
+nonce = homeserver.get("/_synapse/admin/v1/register").raise_for_status().json()["nonce"]
 mac = hmac.new(config.MATRIX_USER_REGISTRATION_SECRET.encode(),
                "\0".join([nonce, user, password, "admin"]).encode(), hashlib.sha1)
-print(homeserver.post("/_synapse/admin/v1/register", json={
-    "nonce": nonce, "username": user, "password": password,
-    "admin": True, "mac": mac.hexdigest()}).json()["access_token"])
+print(user, homeserver.post("/_synapse/admin/v1/register", json={
+    "nonce": nonce, "username": user, "password": password, "admin": True,
+    "mac": mac.hexdigest()}).raise_for_status().json()["access_token"])
 '
 ```
 
@@ -221,6 +221,9 @@ Afterwards, sign that token out:
 ```bash
 curl -k -X POST -H "Authorization: Bearer <token>" https://<WALDUR_DOMAIN>/_matrix/client/v3/logout
 ```
+
+The account stays a homeserver admin with a password nobody knows. With single
+sign-on, add it to `WALDUR_MATRIX_SSO_FORBIDDEN_USERNAMES` like any other admin.
 
 ## Password mode for Matrix clients
 
