@@ -9,9 +9,11 @@
 # drives that conversation, reading every token it needs from the Constance
 # rows init-matrix.sh just wrote.
 #
-# Safe to re-run: the command first checks whether the appservice token already
-# works and exits early if it does, so a plain `docker compose up -d` on an
-# already-configured stack is a no-op rather than a failed container.
+# Safe to re-run: with a working appservice token the command compares the
+# homeserver's registration with Waldur's and replaces it only when it differs,
+# so a plain `docker compose up -d` on an already-configured stack changes
+# nothing. Without admin access it leaves a working registration alone with a
+# warning.
 
 set -euo pipefail
 

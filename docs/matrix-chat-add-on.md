@@ -86,7 +86,7 @@ runs silently before the homeserver listens and scales with the volume size.
 If the log shows the container gave up, raise the limit and `up` again — do not
 restart `tuwunel`.
 
-Re-running `up -d` is safe. The command first checks whether the appservice token already works and exits early when it does, so an already-configured stack is a no-op rather than a failed container.
+Re-running `up -d` is safe. With a working appservice token, the command signs in, compares the homeserver's registration with Waldur's and replaces it when the URL, a token or a namespace differs; otherwise it changes nothing. When it cannot sign in, it leaves a working registration alone, logs a warning and exits 0, unless Waldur turns the homeserver's ping away. [Registering on Tuwunel from the command line](https://docs.waldur.com/latest/developer-guide/admin-guide/matrix-appservice-setup/#registering-on-tuwunel-from-the-command-line) has the details.
 
 Set `WALDUR_MATRIX_REGISTER_APPSERVICE=false` to keep registration entirely
 manual, as below.
@@ -157,9 +157,8 @@ After a hard reload (Cmd-Shift-R / Ctrl-Shift-R), project views show the **Commu
 ## Token rotation
 
 To rotate the AS/HS tokens (e.g., after credential exposure), replace both in the
-secrets volume and bring the profile up again. Always both: only the AS token can
-be checked, so a new HS token alone reports "already registered" while Tuwunel's
-calls to Waldur start failing.
+secrets volume and bring the profile up again. Always both, since either may have
+leaked.
 
 ```bash
 docker compose --profile matrix run --rm --no-deps --entrypoint sh waldur-matrix-init-volume -c '
