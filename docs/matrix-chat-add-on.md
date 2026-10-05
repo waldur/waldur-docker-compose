@@ -190,11 +190,12 @@ registration fails.
 ### Rotating with password login off
 
 With `WALDUR_MATRIX_LOGIN_WITH_PASSWORD=false`, as with single sign-on, the
-bootstrap admin cannot sign in. A rotation then fails after init has seeded
-the new tokens, with "Password login is disabled on the homeserver", and an
-`up` that finds a changed registration only warns instead of replacing it. Pass
-a homeserver admin's access token for that one `up`, from the shell rather than
-`.env`:
+bootstrap admin cannot sign in. An `up` with working tokens then cannot read
+the homeserver's copy of the registration, so it only warns and changes
+nothing, and a rotation fails after init has seeded the new tokens, with
+"Password login is disabled on the homeserver". For a rotation, or to apply a
+changed registration, pass a homeserver admin's access token for that one `up`,
+from the shell rather than `.env`:
 
 ```bash
 WALDUR_MATRIX_ADMIN_TOKEN=<token> docker compose --profile matrix up -d
