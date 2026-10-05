@@ -191,17 +191,21 @@ registration fails.
 
 With `WALDUR_MATRIX_LOGIN_WITH_PASSWORD=false`, as with single sign-on, the
 bootstrap admin cannot sign in. A rotation then fails after init has seeded
-the new tokens, and an `up` that finds a changed registration only warns
-instead of replacing it. Pass a homeserver admin's access token for that one
-`up`, from the shell rather than `.env`:
+the new tokens, with "Password login is disabled on the homeserver", and an
+`up` that finds a changed registration only warns instead of replacing it. Pass
+a homeserver admin's access token for that one `up`, from the shell rather than
+`.env`:
 
 ```bash
 WALDUR_MATRIX_ADMIN_TOKEN=<token> docker compose --profile matrix up -d
 ```
 
-To get one, register a temporary admin through the shared-secret API from
-inside the compose network; Waldur holds the registration token, and this
-prints the account and its access token:
+To get one, register a temporary admin through the shared-secret API, as
+[Token rotation](https://docs.waldur.com/latest/developer-guide/admin-guide/matrix-appservice-setup/#token-rotation)
+in the setup guide describes. On compose, run it in a Waldur container, which
+reaches the homeserver and holds the registration token in Constance, so the
+registration token never passes through a command line. It prints the account
+and its access token:
 
 ```bash
 docker exec waldur-mastermind-worker waldur shell -c '
@@ -309,7 +313,7 @@ Until the appservice is registered, room creation fails with `M_UNKNOWN_TOKEN` i
 
 ## Troubleshooting
 
-- **`waldur-matrix-init` fails and Tuwunel does not start**: read `docker logs waldur-matrix-init`. `init_matrix_settings` refuses appservice tokens in Constance that no deployment seeded, for example from an earlier run of the Setup wizard, and writes nothing. Clear those settings, or start from a fresh stack.
+- **`waldur-matrix-init` fails and Tuwunel does not start**: read `docker logs waldur-matrix-init`. `init_matrix_settings` refuses appservice tokens in Constance that no deployment seeded, for example from an earlier run of the Setup wizard, and writes nothing. To hand the tokens to compose, clear `MATRIX_APPSERVICE_AS_TOKEN` and `MATRIX_APPSERVICE_HS_TOKEN` under **Administration → Configuration → Matrix chat → Settings** and `up` again; otherwise start from a fresh stack.
 - **`M_UNKNOWN_TOKEN` in worker logs after a token rotation**: the homeserver still holds the registration with the old tokens. Check `docker logs waldur-matrix-register` and see Token rotation. Registering the descriptor again by hand does not fix it on its own: Tuwunel keeps the old tokens for an id it already has, so unregister first.
 - **Webhook `DisallowedHost` errors**: the appservice descriptor is rendered with `url: http://waldur-mastermind-api:8080` (the Compose service name), which is in `ALLOWED_HOSTS` for the dockerised settings. If you change the URL — for example to call back via an external hostname — patch `ALLOWED_HOSTS` in `config/waldur-mastermind/override.conf.py`.
 - **Browser chat drawer fails to connect**: the backend talks to Tuwunel internally at `http://tuwunel.internal:6167` (Docker DNS); the browser must reach Tuwunel through Caddy at `https://${WALDUR_DOMAIN}`. `waldur-matrix-init` seeds both — backend uses `MATRIX_HOMESERVER_URL`, browser-facing endpoints serve `MATRIX_HOMESERVER_PUBLIC_URL` (requires `waldur-mastermind` >= 8.x with the dual-URL split). If the chat drawer logs CSP errors connecting to `tuwunel.internal`, verify `MATRIX_HOMESERVER_PUBLIC_URL` is set: `docker exec waldur-mastermind-worker waldur shell -c "from constance import config; print(config.MATRIX_HOMESERVER_PUBLIC_URL)"`.
