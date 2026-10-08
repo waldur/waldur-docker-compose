@@ -26,15 +26,15 @@ Matrix component versions live in `.env`. Bump them deliberately:
 
 | Variable | Default | Component |
 |---|---|---|
-| `WALDUR_TUWUNEL_IMAGE_TAG` | `v1.9.0` | Tuwunel homeserver — requires 1.7.0+ for Synapse-compatible `registration_shared_secret`. **Kept in lockstep with the Helm chart's `matrixChat.homeserver.imageTag`** — one supported homeserver version across both packaging paths |
+| `WALDUR_TUWUNEL_IMAGE_TAG` | `v1.9.3` | Tuwunel homeserver — requires 1.7.0+ for Synapse-compatible `registration_shared_secret`. **Kept in lockstep with the Helm chart's `matrixChat.homeserver.imageTag`** — one supported homeserver version across both packaging paths |
 | `WALDUR_LIVEKIT_IMAGE_TAG` | `v1.13.7` | LiveKit SFU |
 | `WALDUR_LK_JWT_IMAGE_TAG` | `0.7.0` | lk-jwt-service, 0.4.0 or newer: homeport requests call tokens from its `/get_token` endpoint. Requires explicit `LIVEKIT_FULL_ACCESS_HOMESERVERS` (auto-set) |
 
 All three publish multi-arch (`linux/amd64` and `linux/arm64`) manifests for the pinned tags. Re-check with `docker buildx imagetools inspect <image>:<tag>` after bumps.
 
 **Back up before bumping Tuwunel.** It migrates its embedded database in place
-on the first boot of a new version, before it listens and without logging
-anything, so read the
+on the first boot of a new version, before it listens (from 1.9.1 it logs its
+progress every fifteen seconds; earlier versions log nothing), so read the
 [upstream release notes](https://github.com/matrix-construct/tuwunel/releases)
 before moving in either direction. A `tuwunel` container that is up but not
 answering `/_matrix/client/versions` is migrating, not hung: do not restart it,
