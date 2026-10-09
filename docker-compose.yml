@@ -386,6 +386,9 @@ services:
       - WALDUR_MATRIX_SSO_ALLOW_EMAIL_CLAIM=${WALDUR_MATRIX_SSO_ALLOW_EMAIL_CLAIM:-false}
       - WALDUR_MATRIX_SSO_FORBIDDEN_USERNAMES=${WALDUR_MATRIX_SSO_FORBIDDEN_USERNAMES:-}
       - WALDUR_MATRIX_RTC_ENABLED=${WALDUR_MATRIX_RTC_ENABLED:-false}
+      # Waldur issues call tokens, signed with LiveKit's key and secret.
+      - WALDUR_LIVEKIT_KEY=${WALDUR_LIVEKIT_KEY:-devkey}
+      - WALDUR_LIVEKIT_SECRET=${WALDUR_LIVEKIT_SECRET:-devsecret}
     # Same set as *default-mastermind-volumes (a YAML sequence anchor
     # cannot be merged with extra items), plus the matrix bind mount and
     # the shared secrets volume.
@@ -425,7 +428,7 @@ services:
   tuwunel:
     container_name: tuwunel
     profiles: [matrix]
-    image: 'ghcr.io/matrix-construct/tuwunel:${WALDUR_TUWUNEL_IMAGE_TAG:-v1.9.0}'
+    image: 'ghcr.io/matrix-construct/tuwunel:${WALDUR_TUWUNEL_IMAGE_TAG:-v1.9.3}'
     restart: always
     environment:
       TUWUNEL_CONFIG: /etc/waldur/matrix/tuwunel.toml
@@ -442,21 +445,72 @@ services:
     depends_on:
       waldur-matrix-init:
         condition: service_completed_successfully
-    # Disable IPv6 in this netns. lk-jwt-service (matrix-rtc profile) shares
-    # this namespace via `network_mode: service:tuwunel`; its Go dialer
-    # honours RFC 6724 and would otherwise try [::1] first.
-    sysctls:
-      - net.ipv6.conf.all.disable_ipv6=1
     # Tuwunel ships as a distroless image — no shell, no curl/wget — so we
     # rely on `restart: always` and verify reachability through Caddy
     # (curl https://${WALDUR_DOMAIN}/_matrix/client/versions) instead of
     # an in-container healthcheck.
+
+  # The Matrix bot: Waldur's encrypted member of every Waldur room. It answers
+  # chat commands and posts everything Waldur sends as the bot. Run exactly one:
+  # a second refuses to start while the first holds its lease in the database.
+  # Its crypto store is in waldur-db (schema matrix_bot), so it needs no volume.
+  waldur-matrix-bot:
+    container_name: waldur-matrix-bot
+    profiles: [matrix]
+    image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    user: 1001:${DOCKER_GROUP_ID}
+    environment: *default-mastermind-env
+    # Only what Django needs to start. Not the shared mastermind volumes: the
+    # bot parses content from room members, and those carry the Docker socket
+    # (root on the host), SSH and SAML keys it has no use for.
+    volumes:
+      - ${CONFIG_FOLDER}/waldur-mastermind/override.conf.py:/etc/waldur/override.conf.py
+      - ${CONFIG_FOLDER}/waldur-mastermind/logging.conf.py:/etc/waldur/logging.conf.py
+    depends_on:
+      waldur-db:
+        condition: service_healthy
+      waldur-mastermind-db-migration:
+        condition: service_completed_successfully
+      waldur-matrix-init:
+        condition: service_completed_successfully
+      tuwunel:
+        condition: service_started
+    command: matrix-bot
+    restart: always
+    # Time to release its lease on SIGTERM, so a restart need not wait it out.
+    stop_grace_period: 30s
+    extra_hosts: *default-mastermind-hosts
+
+  # Refuses LiveKit's development key and secret unless WALDUR_DOMAIN is
+  # localhost or host.docker.internal. livekit waits for it.
+  livekit-credentials-check:
+    container_name: livekit-credentials-check
+    profiles: [matrix-rtc]
+    image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    environment:
+      - WALDUR_DOMAIN=${WALDUR_DOMAIN:-localhost}
+      - WALDUR_LIVEKIT_KEY=${WALDUR_LIVEKIT_KEY:-devkey}
+      - WALDUR_LIVEKIT_SECRET=${WALDUR_LIVEKIT_SECRET:-devsecret}
+    volumes:
+      - ${CONFIG_FOLDER}/matrix:/etc/waldur/matrix:ro
+    command: ["/etc/waldur/matrix/check-livekit-credentials.sh"]
+    restart: "no"
 
   livekit:
     container_name: livekit
     profiles: [matrix-rtc]
     image: 'livekit/livekit-server:${WALDUR_LIVEKIT_IMAGE_TAG:-v1.13.7}'
     restart: always
+    depends_on:
+      livekit-credentials-check:
+        condition: service_completed_successfully
+    # `livekit.internal` is the dotted alias Waldur uses as MATRIX_LIVEKIT_URL
+    # (room API) — single-word service names fail Django's URLValidator.
+    # Browsers reach signaling through Caddy at wss://${WALDUR_DOMAIN}/livekit.
+    networks:
+      default:
+        aliases:
+          - livekit.internal
     ports:
       - '${WALDUR_MATRIX_RTC_TCP_PORT:-7881}:7881/tcp'
       - '${WALDUR_MATRIX_RTC_UDP_PORT:-7882}:7882/udp'
@@ -486,30 +540,6 @@ services:
           enabled: ${WALDUR_MATRIX_TURN_ENABLED:-false}
           domain: ${WALDUR_DOMAIN:-localhost}
           udp_port: 443
-
-  lk-jwt-service:
-    container_name: lk-jwt-service
-    profiles: [matrix-rtc]
-    image: 'ghcr.io/element-hq/lk-jwt-service:${WALDUR_LK_JWT_IMAGE_TAG:-0.7.0}'
-    restart: always
-    # Share tuwunel's netns so federation discovery resolves "localhost"
-    # back to the homeserver (same trick as docker/matrix-dev/).
-    network_mode: "service:tuwunel"
-    depends_on:
-      - tuwunel
-      - livekit
-    environment:
-      # URL returned to browsers in the JWT response. Must be reachable
-      # from the public internet — LiveKit's signaling port (7880) is
-      # not exposed on the host, so we tunnel WSS through Caddy. Media
-      # still flows on the RTC ports below.
-      LIVEKIT_URL: wss://${WALDUR_DOMAIN:-localhost}/livekit
-      LIVEKIT_KEY: ${WALDUR_LIVEKIT_KEY:-devkey}
-      LIVEKIT_SECRET: ${WALDUR_LIVEKIT_SECRET:-devsecret}
-      LIVEKIT_FULL_ACCESS_HOMESERVERS: ${WALDUR_DOMAIN:-localhost}
-      # Accept Caddy's self-signed cert when TLS=internal. Set to "" or
-      # remove for deployments terminating TLS with a trusted certificate.
-      LIVEKIT_INSECURE_SKIP_VERIFY_TLS: YES_I_KNOW_WHAT_I_AM_DOING
 
   logger:
     image: '${DOCKER_REGISTRY_PREFIX}umputun/docker-logger:v1.3.0'

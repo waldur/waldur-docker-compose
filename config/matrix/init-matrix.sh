@@ -129,8 +129,11 @@ if [[ "${SSO_ENABLED}" == "true" ]]; then
 	FORBIDDEN_USERNAMES="forbidden_usernames = [${FORBIDDEN_USERNAMES}]"
 fi
 
+# Calls: the homeserver's .well-known points Matrix clients (Element and
+# Waldur's chat drawer) at Waldur's call token API, served by the same Caddy
+# site. Waldur gives a LiveKit token only to joined members of the room.
 if [[ "${RTC_ENABLED}" == "true" ]]; then
-	RTC_BLOCK=$'[[global.well_known.rtc_transports]]\ntype = "livekit"\nlivekit_service_url = "https://'"${SERVER_NAME}"$'/lk-jwt"'
+	RTC_BLOCK=$'[[global.well_known.rtc_transports]]\ntype = "livekit"\nlivekit_service_url = "https://'"${SERVER_NAME}"$'/api/matrix/livekit"'
 else
 	RTC_BLOCK=""
 fi
@@ -188,9 +191,7 @@ sed \
 # Browser clients reach the homeserver via Caddy at MATRIX_HOMESERVER_PUBLIC_URL
 # — Django URLValidator rejects single-word hostnames so the internal value
 # uses the `tuwunel.internal` network alias defined in docker-compose.yml.
-CONSTANCE_YAML="$(mktemp)"
-cat > "${CONSTANCE_YAML}" <<-EOF
-	MATRIX_ENABLED: true
+waldur override_constance_settings /dev/stdin <<-EOF
 	MATRIX_HOMESERVER_URL: http://tuwunel.internal:6167
 	MATRIX_HOMESERVER_PUBLIC_URL: https://${SERVER_NAME}
 	MATRIX_HOMESERVER_DOMAIN: ${SERVER_NAME}
@@ -200,8 +201,27 @@ cat > "${CONSTANCE_YAML}" <<-EOF
 	MATRIX_USER_REGISTRATION_SECRET: ${REG_TOKEN}
 EOF
 
-waldur override_constance_settings "${CONSTANCE_YAML}"
-rm -f "${CONSTANCE_YAML}"
+# LiveKit settings Waldur issues call tokens with: the signaling URL browsers
+# dial through Caddy, the room API on the `livekit.internal` alias, and the
+# key and secret LiveKit verifies the tokens with. JSON is valid YAML and
+# quotes whatever the key and secret contain. Piped rather than written to a
+# temp file, like the settings above.
+if [[ "${RTC_ENABLED}" == "true" ]]; then
+	MATRIX_LIVEKIT_PUBLIC_URL="wss://${SERVER_NAME}/livekit" \
+		python3 -c 'import json, os; print(json.dumps({
+	"MATRIX_LIVEKIT_PUBLIC_URL": os.environ["MATRIX_LIVEKIT_PUBLIC_URL"],
+	"MATRIX_LIVEKIT_URL": "http://livekit.internal:7880",
+	"MATRIX_LIVEKIT_KEY": os.environ.get("WALDUR_LIVEKIT_KEY") or "devkey",
+	"MATRIX_LIVEKIT_SECRET": os.environ.get("WALDUR_LIVEKIT_SECRET") or "devsecret",
+}))' | waldur override_constance_settings /dev/stdin
+fi
+
+# Seeded, not overridden: an administrator who switches chat off keeps it off
+# across the next `up`.
+ENABLED_YAML="$(mktemp)"
+echo "MATRIX_ENABLED: true" > "${ENABLED_YAML}"
+waldur override_constance_settings --if-unset "${ENABLED_YAML}"
+rm -f "${ENABLED_YAML}"
 
 echo "matrix-init: Constance seeded. Rendered files in ${SHARED}:"
 ls -l "${SHARED}"
