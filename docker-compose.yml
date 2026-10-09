@@ -442,6 +442,32 @@ services:
     # (curl https://${WALDUR_DOMAIN}/_matrix/client/versions) instead of
     # an in-container healthcheck.
 
+  # The Matrix bot: Waldur's encrypted member of every Waldur room. It answers
+  # chat commands and posts everything Waldur sends as the bot. Run exactly one:
+  # a second refuses to start while the first holds its lease in the database.
+  # Its crypto store is in waldur-db (schema matrix_bot), so it needs no volume.
+  waldur-matrix-bot:
+    container_name: waldur-matrix-bot
+    profiles: [matrix]
+    image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    user: 1001:${DOCKER_GROUP_ID}
+    environment: *default-mastermind-env
+    volumes: *default-mastermind-volumes
+    depends_on:
+      waldur-db:
+        condition: service_healthy
+      waldur-mastermind-db-migration:
+        condition: service_completed_successfully
+      waldur-matrix-init:
+        condition: service_completed_successfully
+      tuwunel:
+        condition: service_started
+    command: matrix-bot
+    restart: always
+    # Time to release its lease on SIGTERM, so a restart need not wait it out.
+    stop_grace_period: 30s
+    extra_hosts: *default-mastermind-hosts
+
   livekit:
     container_name: livekit
     profiles: [matrix-rtc]

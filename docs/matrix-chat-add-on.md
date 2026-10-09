@@ -102,6 +102,24 @@ The bot then becomes `@waldur-bot:<your-domain>` and can post on Waldur's behalf
 
 **Prefer Element Web?** Set `WALDUR_MATRIX_OPEN_REGISTRATION=true` in `.env` before the first `--profile matrix up -d`, then register the admin user via the Element Web sign-up form using `REG_TOKEN` from the secrets volume. Switch the flag back to `false` afterwards (re-render takes effect on the next `--profile matrix up -d`).
 
+## The Matrix bot
+
+The `matrix` profile also starts `waldur-matrix-bot`, Waldur's member of every
+Waldur room. It runs on a Matrix device of its own and holds that device's
+keys, so it is the only process that can post into an encrypted room or read
+the commands sent to it there. While it runs, every message Waldur sends as the
+bot goes through it. It needs the appservice registered (above): until then it
+restarts with a sign-in error.
+
+Run exactly one. It holds a lease in `waldur-db`, and a second one refuses to
+start while the lease is held. Its keys live in `waldur-db` too (schema
+`matrix_bot`), pickled under a key that is encrypted with Waldur's field
+encryption key, so a database backup carries them and no volume is needed.
+
+```bash
+docker logs waldur-matrix-bot 2>&1 | grep "running on device"
+```
+
 ## Enabling the homeport UI
 
 Backend access to Matrix is gated by the `MATRIX_ENABLED` Constance flag (auto-set by `waldur-matrix-init`). The homeport UI is gated separately by a feature flag — enable it once via the `load_features` management command:
