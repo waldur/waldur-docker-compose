@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Refuses LiveKit's development key and secret outside a local demo: anyone
-# who knows them can mint a token for any call. livekit and lk-jwt-service
-# wait for this check, so a refusal keeps both down and fails
+# who knows them can mint a token for any call. livekit waits for this
+# check, so a refusal keeps it down and fails
 # `docker compose up -d`; docs/matrix-chat-add-on.md says what else that can
 # leave down.
 

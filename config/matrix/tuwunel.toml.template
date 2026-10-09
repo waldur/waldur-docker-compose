@@ -47,9 +47,11 @@ refresh_token_ttl = 86400
 media_deny_framing = true
 media_deny_inline_styles = true
 
-# Federation must be ON for lk-jwt-service to verify Matrix OpenID tokens
-# via /_matrix/federation/v1/openid/userinfo (used during the call
-# token exchange). Disabling federation breaks calls.
+# Calls do not need federation: Waldur verifies a caller's Matrix OpenID
+# token at /_matrix/federation/v1/openid/userinfo on the internal
+# MATRIX_HOMESERVER_URL (tuwunel.internal:6167), which Tuwunel serves with
+# federation off too. Turning it off affects only federation with other
+# homeservers.
 allow_federation = true
 
 [global.well_known]

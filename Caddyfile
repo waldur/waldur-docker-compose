@@ -3,8 +3,17 @@
 }
 
 (cors) {
-	@cors_preflight method OPTIONS
-	header {
+	# Waldur's call token API (/api/matrix/livekit/) is called by Matrix
+	# clients on any origin, Element among them, and answers with its own
+	# `Access-Control-Allow-Origin: *` and no credentials, preflights included.
+	# Echoing the origin with credentials on top would send two
+	# Access-Control-Allow-Origin headers, which browsers reject.
+	@cors_preflight {
+		method OPTIONS
+		not path /api/matrix/livekit/*
+	}
+	@cors_credentialed not path /api/matrix/livekit/*
+	header @cors_credentialed {
 		Access-Control-Allow-Origin "{args.0}"
 		Vary Origin
 		Access-Control-Allow-Headers "*"
