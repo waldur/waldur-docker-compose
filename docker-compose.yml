@@ -362,6 +362,8 @@ services:
     # the matrix-specific knobs the init script reads.
     environment:
       - GLOBAL_SECRET_KEY=${GLOBAL_SECRET_KEY}
+      - FIELD_ENCRYPTION_KEY=${FIELD_ENCRYPTION_KEY:-}
+      - FIELD_ENCRYPTION_KEY_FALLBACKS=${FIELD_ENCRYPTION_KEY_FALLBACKS:-}
       - POSTGRESQL_HOST=waldur-db
       - POSTGRESQL_PASSWORD=${POSTGRESQL_PASSWORD}
       - RABBITMQ_HOST=waldur-queue
