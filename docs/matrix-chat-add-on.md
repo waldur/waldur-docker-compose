@@ -365,9 +365,10 @@ With single sign-on on, `waldur-matrix-init` also seeds Waldur's
 `MATRIX_EXTERNAL_LOGIN_METHOD` as `oidc` and `MATRIX_SSO_REGISTRATION_METHOD`
 from `WALDUR_MATRIX_SSO_REGISTRATION_METHOD`: the name of the Waldur identity
 provider this IdP is, such as `keycloak`. Waldur gives a Matrix account only to
-users who signed up through that provider. With single sign-on off it seeds
-neither, so a method set under **Administration → Configuration → Matrix chat
-→ Settings** stays as it is.
+users who signed up through that provider. Both are seeded on every `up`, so
+while single sign-on is on, a method changed in Administration goes back to
+`oidc`. With single sign-on off it seeds neither, so a method set under
+**Administration → Configuration → Matrix chat → Settings** stays as it is.
 
 `waldur-matrix-init` writes the client secret to `sso_client_secret` in the
 secrets volume, not into `tuwunel.toml`. It checks the settings before it
