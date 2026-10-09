@@ -270,7 +270,7 @@ lands in Waldur's account:
   only if the IdP issues addresses of a single domain. It must be the claim Waldur's identity provider uses as
   `user_claim`, with that provider's `user_field` left at `username` and
   `MATRIX_USER_ID_FORMAT=username`, and its values must already be valid
-  Matrix localparts (lowercase letters, digits, `. _ = - / +`). Users with a
+  Matrix localparts (lowercase letters, digits, `. _ - / +`). Users with a
   `+` whom Waldur provisioned before it kept `+` in localparts still have `_`
   instead, so SSO cannot reach their account.
 - `trusted = true` signs in to the existing account that matches the claim, and
