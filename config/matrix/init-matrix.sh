@@ -4,8 +4,11 @@
 # Idempotent: generates AS/HS/registration tokens once into a shared volume,
 # renders the tuwunel.toml, seeds Constance via mastermind's
 # `init_matrix_settings` management command, and renders the appservice
-# descriptor that operators register in Tuwunel's admin room with
-# `!admin appservices register` (see docs/matrix-chat-add-on.md).
+# descriptor.
+#
+# This is the first half of the Matrix bootstrap. The waldur-matrix-register
+# container registers the appservice with the homeserver once Tuwunel is up —
+# see register-matrix.sh.
 
 set -euo pipefail
 
@@ -24,12 +27,16 @@ if [[ ! -f "${SECRETS}" ]]; then
 	AS_TOKEN="$(openssl rand -hex 32)"
 	HS_TOKEN="$(openssl rand -hex 32)"
 	REG_TOKEN="$(openssl rand -hex 32)"
+	# Password of the homeserver admin that waldur-matrix-register creates, so
+	# later runs can sign back in and apply rotated tokens.
+	BOOTSTRAP_PASSWORD="$(openssl rand -hex 32)"
 	cat > "${SECRETS}" <<-EOF
 		AS_TOKEN=${AS_TOKEN}
 		HS_TOKEN=${HS_TOKEN}
 		REG_TOKEN=${REG_TOKEN}
+		BOOTSTRAP_PASSWORD=${BOOTSTRAP_PASSWORD}
 	EOF
-	echo "matrix-init: generated fresh AS/HS/registration tokens"
+	echo "matrix-init: generated fresh AS/HS/registration tokens and bootstrap password"
 else
 	echo "matrix-init: reusing existing tokens from ${SECRETS}"
 fi
@@ -45,6 +52,11 @@ for key in AS_TOKEN HS_TOKEN REG_TOKEN; do
 		exit 1
 	fi
 done
+# Not needed here, so not fatal: waldur-matrix-register refuses to run without
+# it and says how to add one.
+if [[ -z "${BOOTSTRAP_PASSWORD:-}" ]]; then
+	echo "matrix-init: WARNING: ${SECRETS} has no BOOTSTRAP_PASSWORD; waldur-matrix-register will fail until one is added (see its log)" >&2
+fi
 
 SERVER_NAME="${WALDUR_DOMAIN:-localhost}"
 LOCALPART="${WALDUR_MATRIX_BOT_LOCALPART:-waldur-bot}"
@@ -234,11 +246,12 @@ if [[ "${RTC_ENABLED}" == "true" ]]; then
 }))' | waldur override_constance_settings /dev/stdin
 fi
 
-# The descriptor to register in Tuwunel's admin room. Rendered by mastermind
-# from the settings just seeded, so it declares the namespaces Waldur uses,
-# room aliases included.
+# The descriptor for registering by hand (WALDUR_MATRIX_REGISTER_APPSERVICE=false).
+# Rendered by mastermind from the settings just seeded, so it declares the same
+# namespaces as what waldur-matrix-register sends, room aliases included.
 #
-# A failure here is a warning: it must not keep Tuwunel from starting.
+# Only the manual path reads it, so a failure here is a warning: it must not
+# keep Tuwunel from starting.
 # Rendered to a temporary file and checked before it replaces the old one.
 # Mastermind logs to stdout too, as one JSON object per line (a warning about
 # FIELD_ENCRYPTION_KEY, say), so those lines are dropped and the rest must
@@ -267,12 +280,12 @@ with open(sys.argv[2], "w") as f:
 ' "${DESCRIPTOR}.out" "${DESCRIPTOR}.tmp" 2>/dev/null; then
 	rm -f "${DESCRIPTOR}.out"
 	mv "${DESCRIPTOR}.tmp" "${DESCRIPTOR}"
-	echo "matrix-init: appservice descriptor at ${DESCRIPTOR} — register it in Tuwunel's admin room with '!admin appservices register'"
+	echo "matrix-init: appservice descriptor at ${DESCRIPTOR} — registered by the waldur-matrix-register container; only needed by hand with WALDUR_MATRIX_REGISTER_APPSERVICE=false"
 else
 	# An older descriptor may hold tokens that were rotated since; registering
 	# it would put the homeserver and Waldur out of step again.
 	rm -f "${DESCRIPTOR}.out" "${DESCRIPTOR}.tmp" "${DESCRIPTOR}"
-	echo "matrix-init: WARNING: could not render the appservice descriptor, so ${DESCRIPTOR} is absent; see the waldur-matrix-init log" >&2
+	echo "matrix-init: WARNING: could not render the appservice descriptor, so ${DESCRIPTOR} is absent. Automatic registration does not need it; registering by hand does." >&2
 fi
 
 echo "matrix-init: Constance seeded. Rendered files in ${SHARED}:"

@@ -17,6 +17,23 @@
 
 set -euo pipefail
 
+# A homeserver admin's access token, for a change the bootstrap admin cannot
+# make, such as a rotation with password login off. Read from stdin, in a
+# one-off `docker compose run --rm -T ... --admin-token-stdin`, never from the
+# environment: a container's environment stays readable with `docker inspect`
+# for as long as the container exists.
+ADMIN_TOKEN=""
+if [[ "${1:-}" == "--admin-token-stdin" ]]; then
+	IFS= read -r ADMIN_TOKEN || true
+	if [[ -z "${ADMIN_TOKEN}" ]]; then
+		echo "matrix-register: --admin-token-stdin was given, but stdin held no token" >&2
+		exit 1
+	fi
+elif [[ $# -gt 0 ]]; then
+	echo "matrix-register: unknown argument '$1' (the only one is --admin-token-stdin)" >&2
+	exit 1
+fi
+
 if [[ "${WALDUR_MATRIX_REGISTER_APPSERVICE:-true}" != "true" ]]; then
 	echo "matrix-register: disabled (WALDUR_MATRIX_REGISTER_APPSERVICE=false) — register by hand, see docs/matrix-chat-add-on.md"
 	exit 0
@@ -98,13 +115,25 @@ done
 # this command takes from Constance.
 SECRETS=/var/lib/waldur/matrix/secrets.env
 MATRIX_BOOTSTRAP_PASSWORD="$(sed -n 's/^BOOTSTRAP_PASSWORD=//p' "${SECRETS}")"
+
+# Without the bootstrap password the command could only warn and leave the
+# registration as it is, and a later rotation would fail far from the cause.
+# A secrets.env from before automatic registration has no such line.
+if [[ -z "${MATRIX_BOOTSTRAP_PASSWORD}" && -z "${ADMIN_TOKEN}" ]]; then
+	cat >&2 <<-EOF
+		matrix-register: ${SECRETS} has no BOOTSTRAP_PASSWORD, so the appservice cannot be registered or updated.
+		matrix-register: If the homeserver has no @waldur-bootstrap account yet, add a password and run up again:
+		matrix-register:   docker compose --profile matrix run --rm --no-deps --entrypoint sh waldur-matrix-init-volume -c 'echo "BOOTSTRAP_PASSWORD=\$(openssl rand -hex 32)" >> ${SECRETS}'
+		matrix-register: Otherwise pass a homeserver admin's token, see "Rotating with password login off" in docs/matrix-chat-add-on.md.
+	EOF
+	exit 1
+fi
 export MATRIX_BOOTSTRAP_PASSWORD
 
-# Compose always defines WALDUR_MATRIX_ADMIN_TOKEN, empty unless the operator
-# passed one. Exported only when set, so an empty value can never stand in for
-# "use this admin" and the command falls back to the bootstrap account.
-if [[ -n "${WALDUR_MATRIX_ADMIN_TOKEN:-}" ]]; then
-	export MATRIX_ADMIN_TOKEN="${WALDUR_MATRIX_ADMIN_TOKEN}"
+# Exported only when given, so an empty value can never stand in for "use this
+# admin" and the command falls back to the bootstrap account.
+if [[ -n "${ADMIN_TOKEN}" ]]; then
+	export MATRIX_ADMIN_TOKEN="${ADMIN_TOKEN}"
 fi
 
 waldur register_matrix_appservice --url "${CALLBACK_URL}"
