@@ -30,11 +30,33 @@ registration_token = "@@REG_TOKEN@@"
 # create other admins the same way.
 registration_shared_secret = "@@REG_TOKEN@@"
 
+# Otherwise the first account on the server becomes its admin, and Waldur
+# registers an account for whoever opens the chat first. The setup in the docs
+# creates the admin explicitly ("admin": true).
+grant_admin_to_first_user = false
+
 max_request_size = 104857600
 
-# Federation must be ON for lk-jwt-service to verify Matrix OpenID tokens
-# via /_matrix/federation/v1/openid/userinfo (used during the call
-# token exchange). Disabling federation breaks calls.
+# Waldur's chat drawer signs in with a refresh token, so its access tokens
+# expire after 5 minutes and are renewed in the background. The refresh
+# lifetime is an idle timeout: each refresh moves it forward, and a page left
+# silent for a day (e.g. on a suspended laptop) starts a new session through
+# Waldur. Clients that sign in without a refresh token (Element with a
+# password) keep non-expiring tokens.
+access_token_ttl = 300
+refresh_token_ttl = 86400
+
+# Media is served from the same origin as Waldur's web UI here, and only ever
+# shown through the chat clients: refuse to be framed, and allow no inline
+# styles in media served as documents (e.g. SVG).
+media_deny_framing = true
+media_deny_inline_styles = true
+
+# Calls do not need federation: Waldur verifies a caller's Matrix OpenID
+# token at /_matrix/federation/v1/openid/userinfo on the internal
+# MATRIX_HOMESERVER_URL (tuwunel.internal:6167), which Tuwunel serves with
+# federation off too. Turning it off affects only federation with other
+# homeservers.
 allow_federation = true
 
 # No DNS cache. The appservice URL names the mastermind API container, whose IP
