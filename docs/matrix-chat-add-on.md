@@ -93,20 +93,38 @@ manual, as below.
 
 ### Registering by hand
 
-The default config has `WALDUR_MATRIX_OPEN_REGISTRATION=false`, so client-side registration (Element Web sign-up form) is disabled. Use Tuwunel's Synapse-compatible admin endpoint (HMAC-keyed by the registration secret) to provision the admin user. The snippet below does the whole thing — create admin, log in, find the auto-joined admin room, post the `!admin appservices register` message with the descriptor:
+The default config has `WALDUR_MATRIX_OPEN_REGISTRATION=false`, so client-side registration (Element Web sign-up form) is disabled. Use Tuwunel's Synapse-compatible admin endpoint (HMAC-keyed by the registration secret) to provision the admin user. That endpoint is not served through Caddy, which answers `/_synapse/admin/*` with `404`, so the registration step runs inside the compose network, in the `waldur-mastermind-worker` container, against `http://tuwunel.internal:6167`. The snippet below does the whole thing — create admin, log in, find the auto-joined admin room, post the `!admin appservices register` message with the descriptor. Choose the admin's username and password first:
 
 ```bash
 # Read the registration secret from the secrets volume
 REG_SECRET=$(docker compose --profile matrix run --rm --no-deps -T --entrypoint sed \
   waldur-matrix-init-volume -n 's/^REG_TOKEN=//p' /var/lib/waldur/matrix/secrets.env)
 
-# Register an admin user via Synapse-compatible HMAC
-NONCE=$(curl -ks https://localhost/_synapse/admin/v1/register | python3 -c 'import sys,json; print(json.load(sys.stdin)["nonce"])')
-MAC=$(printf '%s\0alice\0alicepass\0admin' "$NONCE" | openssl dgst -sha1 -hmac "$REG_SECRET" -hex | awk '{print $NF}')
-TOKEN=$(curl -ks -X POST https://localhost/_synapse/admin/v1/register \
-  -H 'Content-Type: application/json' \
-  -d "{\"nonce\":\"$NONCE\",\"username\":\"alice\",\"password\":\"alicepass\",\"admin\":true,\"mac\":\"$MAC\"}" \
-  | python3 -c 'import sys,json; print(json.load(sys.stdin)["access_token"])')
+# Register an admin user via Synapse-compatible HMAC, inside the compose
+# network: /_synapse/admin is not served through Caddy
+export REG_SECRET ADMIN_USER=matrix-admin ADMIN_PASSWORD='<choose-a-password>'
+TOKEN=$(docker exec -i -e REG_SECRET -e ADMIN_USER -e ADMIN_PASSWORD \
+  waldur-mastermind-worker python3 - <<'EOF'
+import hashlib, hmac, json, os, urllib.request
+
+URL = "http://tuwunel.internal:6167/_synapse/admin/v1/register"
+user, password = os.environ["ADMIN_USER"], os.environ["ADMIN_PASSWORD"]
+
+
+def call(body=None):
+    data = None if body is None else json.dumps(body).encode()
+    request = urllib.request.Request(URL, data, {"Content-Type": "application/json"})
+    with urllib.request.urlopen(request) as response:
+        return json.load(response)
+
+
+nonce = call()["nonce"]
+mac = hmac.new(os.environ["REG_SECRET"].encode(),
+               "\0".join([nonce, user, password, "admin"]).encode(), hashlib.sha1)
+print(call({"nonce": nonce, "username": user, "password": password,
+            "admin": True, "mac": mac.hexdigest()})["access_token"])
+EOF
+)
 
 # Locate the admin room Tuwunel auto-joins the admin user to
 ROOM=$(curl -ks -H "Authorization: Bearer $TOKEN" https://localhost/_matrix/client/v3/joined_rooms \
