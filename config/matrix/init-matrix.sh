@@ -83,6 +83,20 @@ if [[ "${SSO_ENABLED}" == "true" ]]; then
 		exit 1
 		;;
 	esac
+	# Tuwunel takes only the local part of an email claim, so alice@a.org and
+	# alice@b.org would sign in to the same account.
+	ALLOW_EMAIL_CLAIM="${WALDUR_MATRIX_SSO_ALLOW_EMAIL_CLAIM:-false}"
+	if [[ "${SSO_CLAIM}" == "email" && "${ALLOW_EMAIL_CLAIM}" != "true" ]]; then
+		echo "matrix-init: WALDUR_MATRIX_SSO_USERID_CLAIM=email uses only the local part of the address, so alice@a.org and alice@b.org would sign in to the same account. Use another claim, or set WALDUR_MATRIX_SSO_ALLOW_EMAIL_CLAIM=true if the IdP issues addresses of a single domain." >&2
+		exit 1
+	fi
+	# A trusted provider signs in to any existing account named like the claim,
+	# so with open registration anyone could register @bob first and receive
+	# bob's single sign-on.
+	if [[ "${OPEN_REG}" != "false" ]]; then
+		echo "matrix-init: WALDUR_MATRIX_SSO_ENABLED=true cannot be combined with WALDUR_MATRIX_OPEN_REGISTRATION=${OPEN_REG}: anyone could register an account named like another user's claim and receive that user's single sign-on. Set WALDUR_MATRIX_OPEN_REGISTRATION=false." >&2
+		exit 1
+	fi
 	# A trusted provider signs in to any existing account its claim names, so
 	# the bot's account, waldur-bootstrap (reserved for the bootstrap admin that
 	# automatic registration will create) and any other admin are kept out of
