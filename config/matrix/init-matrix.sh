@@ -38,8 +38,11 @@ LOCALPART="${WALDUR_MATRIX_BOT_LOCALPART:-waldur-bot}"
 OPEN_REG="${WALDUR_MATRIX_OPEN_REGISTRATION:-false}"
 RTC_ENABLED="${WALDUR_MATRIX_RTC_ENABLED:-false}"
 
+# Calls: the homeserver's .well-known points Matrix clients (Element and
+# Waldur's chat drawer) at Waldur's call token API, served by the same Caddy
+# site. Waldur gives a LiveKit token only to joined members of the room.
 if [[ "${RTC_ENABLED}" == "true" ]]; then
-	RTC_BLOCK=$'[[global.well_known.rtc_transports]]\ntype = "livekit"\nlivekit_service_url = "https://'"${SERVER_NAME}"$'/lk-jwt"'
+	RTC_BLOCK=$'[[global.well_known.rtc_transports]]\ntype = "livekit"\nlivekit_service_url = "https://'"${SERVER_NAME}"$'/api/matrix/livekit"'
 else
 	RTC_BLOCK=""
 fi
@@ -82,6 +85,23 @@ EOF
 
 waldur override_constance_settings "${CONSTANCE_YAML}"
 rm -f "${CONSTANCE_YAML}"
+
+# LiveKit settings Waldur issues call tokens with: the signaling URL browsers
+# dial through Caddy, the room API on the `livekit.internal` alias, and the
+# key and secret LiveKit verifies the tokens with. JSON is valid YAML and
+# quotes whatever the key and secret contain.
+if [[ "${RTC_ENABLED}" == "true" ]]; then
+	LIVEKIT_YAML="$(mktemp)"
+	MATRIX_LIVEKIT_PUBLIC_URL="wss://${SERVER_NAME}/livekit" \
+		python3 -c 'import json, os; print(json.dumps({
+	"MATRIX_LIVEKIT_PUBLIC_URL": os.environ["MATRIX_LIVEKIT_PUBLIC_URL"],
+	"MATRIX_LIVEKIT_URL": "http://livekit.internal:7880",
+	"MATRIX_LIVEKIT_KEY": os.environ.get("WALDUR_LIVEKIT_KEY") or "devkey",
+	"MATRIX_LIVEKIT_SECRET": os.environ.get("WALDUR_LIVEKIT_SECRET") or "devsecret",
+}))' > "${LIVEKIT_YAML}"
+	waldur override_constance_settings "${LIVEKIT_YAML}"
+	rm -f "${LIVEKIT_YAML}"
+fi
 
 # Seeded, not overridden: an administrator who switches chat off keeps it off
 # across the next `up`.
