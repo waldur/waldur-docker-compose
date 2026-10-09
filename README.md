@@ -379,7 +379,7 @@ http://keycloak:8080/auth/realms/<YOUR REALM>/.well-known/openid-configuration
 
 ## Matrix chat add-on
 
-Two optional Compose profiles bring up a self-contained Matrix homeserver alongside Waldur — `matrix` for chat and `matrix-rtc` for voice/video calls. Activation, the appservice registration, token rotation, troubleshooting, and the rest of the operator guide live in `docs/matrix-chat-add-on.md` in this repo, and on the Waldur docs site under the docker-compose deployment guide.
+Two optional Compose profiles bring up a self-contained Matrix homeserver alongside Waldur — `matrix` for chat and `matrix-rtc` for voice/video calls. Activation, the automatic appservice registration, token rotation, troubleshooting, and the rest of the operator guide live in `docs/matrix-chat-add-on.md` in this repo, and on the Waldur docs site under the docker-compose deployment guide.
 
 ## Web shell (development only)
 
