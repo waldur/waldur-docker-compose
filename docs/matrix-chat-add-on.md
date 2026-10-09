@@ -93,53 +93,83 @@ manual, as below.
 
 ### Registering by hand
 
-The default config has `WALDUR_MATRIX_OPEN_REGISTRATION=false`, so client-side registration (Element Web sign-up form) is disabled. Use Tuwunel's Synapse-compatible admin endpoint (HMAC-keyed by the registration secret) to provision the admin user. The snippet below does the whole thing — create admin, log in, find the auto-joined admin room, post the `!admin appservices register` message with the descriptor:
+The default config has `WALDUR_MATRIX_OPEN_REGISTRATION=false`, so client-side registration (Element Web sign-up form) is disabled. Use Tuwunel's Synapse-compatible admin endpoint (HMAC-keyed by the registration secret) to provision the admin user. That endpoint is not served through Caddy, which answers `/_synapse/admin/*` with `404`, so the snippet below runs inside the compose network, in a throwaway `waldur-matrix-init` container that has the secrets volume mounted, against `http://tuwunel.internal:6167`. It does the whole thing — create the admin, find the admin room, post the `!admin appservices register` message with the descriptor, print Tuwunel's reply. The registration secret, the appservice tokens and the admin's access token are read and used inside the container only, so none of them reaches the host's command lines or shell history.
+
+Choose the admin's username, and type its password at the prompt rather than on a command line:
 
 ```bash
-# Read the registration secret from the secrets volume
-REG_SECRET=$(docker compose --profile matrix run --rm --no-deps -T --entrypoint sed \
-  waldur-matrix-init-volume -n 's/^REG_TOKEN=//p' /var/lib/waldur/matrix/secrets.env)
+read -rs -p 'Matrix admin password: ' ADMIN_PASSWORD && echo && export ADMIN_PASSWORD
+ADMIN_USER=matrix-admin REPLACE=false docker compose --profile matrix run --rm --no-deps -T \
+  -e ADMIN_USER -e ADMIN_PASSWORD -e REPLACE --entrypoint python3 waldur-matrix-init - <<'EOF'
+import hashlib, hmac, json, os, time, urllib.parse, urllib.request
 
-# Register an admin user via Synapse-compatible HMAC
-NONCE=$(curl -ks https://localhost/_synapse/admin/v1/register | python3 -c 'import sys,json; print(json.load(sys.stdin)["nonce"])')
-MAC=$(printf '%s\0alice\0alicepass\0admin' "$NONCE" | openssl dgst -sha1 -hmac "$REG_SECRET" -hex | awk '{print $NF}')
-TOKEN=$(curl -ks -X POST https://localhost/_synapse/admin/v1/register \
-  -H 'Content-Type: application/json' \
-  -d "{\"nonce\":\"$NONCE\",\"username\":\"alice\",\"password\":\"alicepass\",\"admin\":true,\"mac\":\"$MAC\"}" \
-  | python3 -c 'import sys,json; print(json.load(sys.stdin)["access_token"])')
+HOMESERVER = "http://tuwunel.internal:6167"
+SHARED = "/var/lib/waldur/matrix"  # the waldur_matrix_secrets volume
+username, password = os.environ["ADMIN_USER"], os.environ["ADMIN_PASSWORD"]
 
-# Locate the admin room Tuwunel auto-joins the admin user to
-ROOM=$(curl -ks -H "Authorization: Bearer $TOKEN" https://localhost/_matrix/client/v3/joined_rooms \
-  | python3 -c 'import sys,json; print(json.load(sys.stdin)["joined_rooms"][0])')
-ROOM_ENC=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$ROOM', safe=''))")
+
+def call(method, path, body=None, token=None):
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    data = None if body is None else json.dumps(body).encode()
+    request = urllib.request.Request(HOMESERVER + path, data, headers, method=method)
+    with urllib.request.urlopen(request) as response:
+        return json.load(response)
+
+
+secrets = dict(line.split("=", 1) for line in open(f"{SHARED}/secrets.env").read().split())
+
+# Register the admin via Synapse-compatible HMAC
+nonce = call("GET", "/_synapse/admin/v1/register")["nonce"]
+message = "\0".join([nonce, username, password, "admin"]).encode()
+mac = hmac.new(secrets["REG_TOKEN"].encode(), message, hashlib.sha1).hexdigest()
+admin = call("POST", "/_synapse/admin/v1/register", {
+    "nonce": nonce, "username": username, "password": password, "admin": True, "mac": mac,
+})
+token, user_id = admin["access_token"], admin["user_id"]
+
+# The admin joins the admin room, #admins:<server name>
+alias = urllib.parse.quote("#admins:" + user_id.split(":", 1)[1])
+room = urllib.parse.quote(call("GET", f"/_matrix/client/v3/directory/room/{alias}")["room_id"])
+
+
+def command(body):
+    """Post an admin-room command and print Tuwunel's reply to it."""
+    sent = call("PUT", f"/_matrix/client/v3/rooms/{room}/send/m.room.message/setup-{time.time_ns()}", {
+        "msgtype": "m.text", "body": body,
+    }, token)
+    # Tuwunel answers asynchronously
+    for _ in range(10):
+        time.sleep(1)
+        messages = call("GET", f"/_matrix/client/v3/rooms/{room}/messages?dir=b&limit=10", token=token)
+        for event in messages["chunk"]:
+            if event["event_id"] == sent["event_id"]:
+                break
+            if event["type"] == "m.room.message" and event["sender"] != user_id:
+                print(event["content"]["body"])
+                return
+    print("No reply yet; read the admin room in a Matrix client")
+
+
+if os.environ.get("REPLACE") == "true":
+    command("!admin appservices unregister waldur")
 
 # Post the !admin appservices register command with the rendered descriptor
-YAML=$(docker compose --profile matrix run --rm --no-deps -T --entrypoint cat \
-  waldur-matrix-init-volume /var/lib/waldur/matrix/waldur-registration.yaml)
-BODY=$(python3 -c "import json; yaml='''$YAML'''; print(json.dumps({'msgtype':'m.text','body':'!admin appservices register\n\`\`\`yaml\n'+yaml+'\n\`\`\`'}))")
-curl -ks -X PUT -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  --data-binary "$BODY" \
-  "https://localhost/_matrix/client/v3/rooms/$ROOM_ENC/send/m.room.message/$(date +%s%N)"
-
-# Confirm Tuwunel acknowledged
-curl -ks -H "Authorization: Bearer $TOKEN" \
-  "https://localhost/_matrix/client/v3/rooms/$ROOM_ENC/messages?dir=b&limit=2" \
-  | python3 -c "import sys,json; print([c.get('content',{}).get('body','')[:80] for c in json.load(sys.stdin).get('chunk',[])])"
-# Expect: ['Appservice registered with ID: waldur', '...']
+descriptor = open(f"{SHARED}/waldur-registration.yaml").read()
+command(f"!admin appservices register\n```yaml\n{descriptor}\n```")
+EOF
+unset ADMIN_PASSWORD
+# Expect: Appservice registered with ID: waldur
 ```
 
 The bot then becomes `@waldur-bot:<your-domain>` and can post on Waldur's behalf.
 
-The snippet only registers. If the homeserver already holds a `waldur`
+By default the snippet only registers. If the homeserver already holds a `waldur`
 registration, after a token rotation say, Tuwunel answers `Duplicate id` and
-keeps the old tokens. Unregister it first from the same shell, check the reply
-with the confirm step, then post the register command again:
-
-```bash
-curl -ks -X PUT -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  --data-binary '{"msgtype":"m.text","body":"!admin appservices unregister waldur"}' \
-  "https://localhost/_matrix/client/v3/rooms/$ROOM_ENC/send/m.room.message/unregister-$(date +%s)"
-```
+keeps the old tokens. Run it again with `REPLACE=true` and another admin
+username: it then posts `!admin appservices unregister waldur` first and prints
+the reply to each command.
 
 **Prefer Element Web?** Set `WALDUR_MATRIX_OPEN_REGISTRATION=true` in `.env` before the first `--profile matrix up -d`, then register the admin user via the Element Web sign-up form using `REG_TOKEN` from the secrets volume. Switch the flag back to `false` afterwards (re-render takes effect on the next `--profile matrix up -d`).
 
