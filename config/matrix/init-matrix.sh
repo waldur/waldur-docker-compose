@@ -72,8 +72,7 @@ sed \
 # Browser clients reach the homeserver via Caddy at MATRIX_HOMESERVER_PUBLIC_URL
 # — Django URLValidator rejects single-word hostnames so the internal value
 # uses the `tuwunel.internal` network alias defined in docker-compose.yml.
-CONSTANCE_YAML="$(mktemp)"
-cat > "${CONSTANCE_YAML}" <<-EOF
+waldur override_constance_settings /dev/stdin <<-EOF
 	MATRIX_HOMESERVER_URL: http://tuwunel.internal:6167
 	MATRIX_HOMESERVER_PUBLIC_URL: https://${SERVER_NAME}
 	MATRIX_HOMESERVER_DOMAIN: ${SERVER_NAME}
@@ -83,14 +82,11 @@ cat > "${CONSTANCE_YAML}" <<-EOF
 	MATRIX_USER_REGISTRATION_SECRET: ${REG_TOKEN}
 EOF
 
-waldur override_constance_settings "${CONSTANCE_YAML}"
-rm -f "${CONSTANCE_YAML}"
-
 # LiveKit settings Waldur issues call tokens with: the signaling URL browsers
 # dial through Caddy, the room API on the `livekit.internal` alias, and the
 # key and secret LiveKit verifies the tokens with. JSON is valid YAML and
 # quotes whatever the key and secret contain. Piped rather than written to a
-# temp file, so the secret never lands on disk.
+# temp file, like the settings above.
 if [[ "${RTC_ENABLED}" == "true" ]]; then
 	MATRIX_LIVEKIT_PUBLIC_URL="wss://${SERVER_NAME}/livekit" \
 		python3 -c 'import json, os; print(json.dumps({
