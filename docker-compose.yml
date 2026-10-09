@@ -452,7 +452,12 @@ services:
     image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
     user: 1001:${DOCKER_GROUP_ID}
     environment: *default-mastermind-env
-    volumes: *default-mastermind-volumes
+    # Only what Django needs to start. Not the shared mastermind volumes: the
+    # bot parses content from room members, and those carry the Docker socket
+    # (root on the host), SSH and SAML keys it has no use for.
+    volumes:
+      - ${CONFIG_FOLDER}/waldur-mastermind/override.conf.py:/etc/waldur/override.conf.py
+      - ${CONFIG_FOLDER}/waldur-mastermind/logging.conf.py:/etc/waldur/logging.conf.py
     depends_on:
       waldur-db:
         condition: service_healthy

@@ -120,6 +120,13 @@ encryption key, so a database backup carries them and no volume is needed.
 docker logs waldur-matrix-bot 2>&1 | grep "running on device"
 ```
 
+Because its keys live in the database, a copy of that database carries the
+bot's identity. Before starting a stack on a restored copy of another
+deployment's database (a staging copy of production, say), leave out the
+`matrix` profile or drop the copy's `matrix_bot` schema and
+`matrix_chat_matrixbotidentity` rows. Otherwise a second bot runs as the same
+device, can read the original's rooms, and corrupts both bots' sessions.
+
 ## Enabling the homeport UI
 
 Backend access to Matrix is gated by the `MATRIX_ENABLED` Constance flag (auto-set by `waldur-matrix-init`). The homeport UI is gated separately by a feature flag — enable it once via the `load_features` management command:
