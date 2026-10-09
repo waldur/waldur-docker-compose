@@ -120,6 +120,14 @@ if [[ "${SSO_ENABLED}" == "true" ]]; then
 		echo "matrix-init: WALDUR_MATRIX_SSO_USERID_CLAIM=email uses only the local part of the address, so alice@a.org and alice@b.org would sign in to the same account. Use another claim, or set WALDUR_MATRIX_SSO_ALLOW_EMAIL_CLAIM=true if the IdP issues addresses of a single domain." >&2
 		exit 1
 	fi
+	# Waldur gives a Matrix account only to users who signed up through this
+	# identity provider, and to nobody while the method is blank, so single
+	# sign-on without it would come up with no one able to chat.
+	SSO_REGISTRATION_METHOD="${WALDUR_MATRIX_SSO_REGISTRATION_METHOD:-}"
+	if [[ ! "${SSO_REGISTRATION_METHOD}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+		echo "matrix-init: set WALDUR_MATRIX_SSO_REGISTRATION_METHOD to the name of the Waldur identity provider the homeserver's single sign-on uses, such as keycloak (letters, digits, '.', '_' and '-')" >&2
+		exit 1
+	fi
 	# A trusted provider signs in to any existing account named like the claim,
 	# so with open registration anyone could register @bob first and receive
 	# bob's single sign-on.
@@ -228,6 +236,13 @@ export MATRIX_APPSERVICE_AS_TOKEN="${AS_TOKEN}"
 export MATRIX_APPSERVICE_HS_TOKEN="${HS_TOKEN}"
 export MATRIX_APPSERVICE_SENDER_LOCALPART="${LOCALPART}"
 export MATRIX_USER_REGISTRATION_SECRET="${REG_TOKEN}"
+
+# Single sign-on for Matrix clients. Without it neither setting is seeded, so a
+# method an administrator chose (password, say) survives the next `up`.
+if [[ "${SSO_ENABLED}" == "true" ]]; then
+	export MATRIX_EXTERNAL_LOGIN_METHOD=oidc
+	export MATRIX_SSO_REGISTRATION_METHOD="${SSO_REGISTRATION_METHOD}"
+fi
 
 # LiveKit settings Waldur issues call tokens with: the signaling URL browsers
 # dial through Caddy, the room API on the `livekit.internal` alias, and the
