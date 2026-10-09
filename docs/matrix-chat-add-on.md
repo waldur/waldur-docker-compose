@@ -219,7 +219,10 @@ explains how the accounts line up and why the homeserver is configured this
 way; this section covers the compose settings.
 
 Set the method under **Administration → Configuration → Matrix chat →
-Settings**; compose does not seed it. Register a client at the IdP with the
+Settings**, and next to it `MATRIX_SSO_REGISTRATION_METHOD` to the name of the
+Waldur identity provider the homeserver's single sign-on uses, such as
+`keycloak`. Waldur gives a Matrix account only to users who signed up through
+that provider, and while the setting is blank, to nobody. Compose seeds neither. Register a client at the IdP with the
 redirect URI
 `https://<WALDUR_DOMAIN>/_matrix/client/unstable/login/sso/callback/<client id>`,
 then set in `.env`:
