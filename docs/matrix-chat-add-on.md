@@ -64,18 +64,20 @@ the whole chat corpus. Changing the domain means a fresh homeserver.
 
 Tuwunel does not load appservice descriptors from a file — it requires registration via the `!admin appservices register` admin-room command. The `waldur-matrix-init` container renders a ready-to-paste descriptor into the `waldur_matrix_secrets` volume; do the following once after the first `--profile matrix up -d`.
 
-The default config has `WALDUR_MATRIX_OPEN_REGISTRATION=false`, so client-side registration (Element Web sign-up form) is disabled. Use Tuwunel's Synapse-compatible admin endpoint (HMAC-keyed by the registration secret) to provision the admin user. That endpoint is not served through Caddy, so the snippet below runs inside the Compose network, in a throwaway `waldur-matrix-init` container that has the secrets volume mounted. It does the whole thing — create the admin, find the admin room, post the `!admin appservices register` message with the descriptor, print Tuwunel's reply. Choose the admin's username and password first; the script refuses to run while the password is still `change-me`:
+The default config has `WALDUR_MATRIX_OPEN_REGISTRATION=false`, so client-side registration (Element Web sign-up form) is disabled. Use Tuwunel's Synapse-compatible admin endpoint (HMAC-keyed by the registration secret) to provision the admin user. That endpoint is not served through Caddy, so the snippet below runs inside the Compose network, in a throwaway `waldur-matrix-init` container that has the secrets volume mounted. It does the whole thing — create the admin, find the admin room, post the `!admin appservices register` message with the descriptor and then `!admin users make-user-admin` for the bot, print Tuwunel's replies. Choose the admin's username, and type its password at the prompt, so it lands neither in shell history nor on a command line:
 
 ```bash
-docker compose run --rm --no-deps -T --entrypoint python3 waldur-matrix-init - <<'EOF'
-import hashlib, hmac, json, time, urllib.parse, urllib.request
+read -rs -p 'Matrix admin password: ' ADMIN_PASSWORD && echo && export ADMIN_PASSWORD
+ADMIN_USER=matrix-admin docker compose run --rm --no-deps -T \
+  -e ADMIN_USER -e ADMIN_PASSWORD --entrypoint python3 waldur-matrix-init - <<'EOF'
+import hashlib, hmac, json, os, time, urllib.parse, urllib.request
 
-USERNAME, PASSWORD = "matrix-admin", "change-me"
+USERNAME, PASSWORD = os.environ["ADMIN_USER"], os.environ["ADMIN_PASSWORD"]
 HOMESERVER = "http://tuwunel.internal:6167"
 SHARED = "/var/lib/waldur/matrix"  # the waldur_matrix_secrets volume
 
-if PASSWORD == "change-me":
-    raise SystemExit("Set PASSWORD at the top of this script before running it")
+if not PASSWORD:
+    raise SystemExit("Set ADMIN_PASSWORD before running this script")
 
 
 def call(method, path, body=None, token=None):
@@ -98,40 +100,49 @@ admin = call("POST", "/_synapse/admin/v1/register", {
     "nonce": nonce, "username": USERNAME, "password": PASSWORD, "admin": True, "mac": mac,
 })
 token, user_id = admin["access_token"], admin["user_id"]
+server_name = user_id.split(":", 1)[1]
 
 # The admin joins the admin room, #admins:<server name>
-alias = urllib.parse.quote("#admins:" + user_id.split(":", 1)[1])
+alias = urllib.parse.quote("#admins:" + server_name)
 room = urllib.parse.quote(call("GET", f"/_matrix/client/v3/directory/room/{alias}")["room_id"])
+
+
+def command(body):
+    """Post an admin-room command and print Tuwunel's reply to it."""
+    sent = call("PUT", f"/_matrix/client/v3/rooms/{room}/send/m.room.message/setup-{time.time_ns()}", {
+        "msgtype": "m.text", "body": body,
+    }, token)
+    # Tuwunel answers asynchronously
+    for _ in range(10):
+        time.sleep(1)
+        messages = call("GET", f"/_matrix/client/v3/rooms/{room}/messages?dir=b&limit=10", token=token)
+        for event in messages["chunk"]:
+            if event["event_id"] == sent["event_id"]:
+                break
+            if event["type"] == "m.room.message" and event["sender"] != user_id:
+                print(event["content"]["body"])
+                return
+    print("No reply yet; read the admin room in a Matrix client")
+
 
 # Post the !admin appservices register command with the rendered descriptor
 descriptor = open(f"{SHARED}/waldur-registration.yaml").read()
-sent = call("PUT", f"/_matrix/client/v3/rooms/{room}/send/m.room.message/setup-{time.time_ns()}", {
-    "msgtype": "m.text", "body": f"!admin appservices register\n```yaml\n{descriptor}\n```",
-}, token)
+command(f"!admin appservices register\n```yaml\n{descriptor}\n```")
 
-
-def reply():
-    messages = call("GET", f"/_matrix/client/v3/rooms/{room}/messages?dir=b&limit=10", token=token)
-    for event in messages["chunk"]:
-        if event["event_id"] == sent["event_id"]:
-            return None
-        if event["type"] == "m.room.message" and event["sender"] != user_id:
-            return event["content"]["body"]
-
-
-# Tuwunel answers asynchronously
-for _ in range(10):
-    time.sleep(1)
-    if text := reply():
-        print(text)
-        break
-else:
-    print("No reply yet; read the admin room in a Matrix client")
+# Make the bot a homeserver admin, see below for why
+bot = f"@{os.environ['WALDUR_MATRIX_BOT_LOCALPART']}:{server_name}"
+command(f"!admin users make-user-admin {bot}")
 EOF
+unset ADMIN_PASSWORD
 # Expect: Appservice registered with ID: waldur
+# and a confirmation that @waldur-bot:<your-domain> is now an admin
 ```
 
-The bot then becomes `@waldur-bot:<your-domain>` and can post on Waldur's behalf.
+The bot then becomes `@waldur-bot:<your-domain>` (`WALDUR_MATRIX_BOT_LOCALPART`) and can post on Waldur's behalf.
+
+The second command makes the bot a homeserver admin. Waldur calls the homeserver's admin API as the bot: resetting a user's chat encryption from the drawer goes through `/_synapse/admin/v1/reset_password`, and a user deactivated in Waldur is locked on the homeserver the same way. Without admin rights the homeserver refuses those calls. Nothing makes the bot an admin by accident: Tuwunel runs with `grant_admin_to_first_user = false`, and the admin API is reachable only on the internal network. On a deployment registered before this step was part of the snippet, sign in to the admin room as the admin and send `!admin users make-user-admin @waldur-bot:<your-domain>` there.
+
+**From then on, whoever holds the appservice token is a homeserver admin.** The appservice token (`AS_TOKEN`) acts as the bot, so with it anyone can call the admin API, for example to reset any account's password and take it over, and, should the bot ever be joined to `#admins:<your-domain>`, send `!admin` commands there. The token is stored in three places: `secrets.env` and the rendered `waldur-registration.yaml` in the `waldur_matrix_secrets` volume, and Waldur's Constance settings in `waldur-db`, which database backups carry too. Restrict access to the volume, the database and its backups accordingly, and if the token may have been exposed, rotate it as described under [Token rotation](#token-rotation).
 
 The admin must be created this way, with `"admin": true`. Tuwunel runs with `grant_admin_to_first_user = false`, so no account becomes an admin just by being the first one. Otherwise Waldur, which registers an account for whoever opens the chat first, could hand a user the homeserver's admin room. Once created, the admin can sign in to Element Web with that username and password.
 
@@ -146,7 +157,8 @@ Waldur room. It runs on a Matrix device of its own and holds that device's
 keys, so it is the only process that can post into an encrypted room or read
 the commands sent to it there. While it runs, every message Waldur sends as the
 bot goes through it. It needs the appservice registered (above): until then it
-restarts with a sign-in error.
+restarts with a sign-in error. It also needs to be a homeserver admin (above)
+for the drawer's encryption reset and for locking users deactivated in Waldur.
 
 Run exactly one. It holds a lease in `waldur-db`, and a second one refuses to
 start while the lease is held. Its keys live in `waldur-db` too (schema
