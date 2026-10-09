@@ -473,11 +473,29 @@ services:
     stop_grace_period: 30s
     extra_hosts: *default-mastermind-hosts
 
+  # Refuses LiveKit's development key and secret unless WALDUR_DOMAIN is
+  # localhost or host.docker.internal. livekit and lk-jwt-service wait for it.
+  livekit-credentials-check:
+    container_name: livekit-credentials-check
+    profiles: [matrix-rtc]
+    image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    environment:
+      - WALDUR_DOMAIN=${WALDUR_DOMAIN:-localhost}
+      - WALDUR_LIVEKIT_KEY=${WALDUR_LIVEKIT_KEY:-devkey}
+      - WALDUR_LIVEKIT_SECRET=${WALDUR_LIVEKIT_SECRET:-devsecret}
+    volumes:
+      - ${CONFIG_FOLDER}/matrix:/etc/waldur/matrix:ro
+    command: ["/etc/waldur/matrix/check-livekit-credentials.sh"]
+    restart: "no"
+
   livekit:
     container_name: livekit
     profiles: [matrix-rtc]
     image: 'livekit/livekit-server:${WALDUR_LIVEKIT_IMAGE_TAG:-v1.13.7}'
     restart: always
+    depends_on:
+      livekit-credentials-check:
+        condition: service_completed_successfully
     ports:
       - '${WALDUR_MATRIX_RTC_TCP_PORT:-7881}:7881/tcp'
       - '${WALDUR_MATRIX_RTC_UDP_PORT:-7882}:7882/udp'
@@ -517,8 +535,12 @@ services:
     # back to the homeserver (same trick as docker/matrix-dev/).
     network_mode: "service:tuwunel"
     depends_on:
-      - tuwunel
-      - livekit
+      tuwunel:
+        condition: service_started
+      livekit:
+        condition: service_started
+      livekit-credentials-check:
+        condition: service_completed_successfully
     environment:
       # URL returned to browsers in the JWT response. Must be reachable
       # from the public internet — LiveKit's signaling port (7880) is

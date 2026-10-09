@@ -64,43 +64,80 @@ the whole chat corpus. Changing the domain means a fresh homeserver.
 
 Tuwunel does not load appservice descriptors from a file — it requires registration via the `!admin appservices register` admin-room command. The `waldur-matrix-init` container renders a ready-to-paste descriptor into the `waldur_matrix_secrets` volume; do the following once after the first `--profile matrix up -d`.
 
-The default config has `WALDUR_MATRIX_OPEN_REGISTRATION=false`, so client-side registration (Element Web sign-up form) is disabled. Use Tuwunel's Synapse-compatible admin endpoint (HMAC-keyed by the registration secret) to provision the admin user. The snippet below does the whole thing — create admin, log in, find the auto-joined admin room, post the `!admin appservices register` message with the descriptor:
+The default config has `WALDUR_MATRIX_OPEN_REGISTRATION=false`, so client-side registration (Element Web sign-up form) is disabled. Use Tuwunel's Synapse-compatible admin endpoint (HMAC-keyed by the registration secret) to provision the admin user. That endpoint is not served through Caddy, so the snippet below runs inside the Compose network, in a throwaway `waldur-matrix-init` container that has the secrets volume mounted. It does the whole thing — create the admin, find the admin room, post the `!admin appservices register` message with the descriptor, print Tuwunel's reply. Choose the admin's username and password first; the script refuses to run while the password is still `change-me`:
 
 ```bash
-# Pull the registration secret out of the shared volume
-REG_SECRET=$(docker run --rm -v waldur-docker-compose_waldur_matrix_secrets:/m alpine \
-  sh -c 'grep REG_TOKEN /m/secrets.env | cut -d= -f2')
+docker compose run --rm --no-deps -T --entrypoint python3 waldur-matrix-init - <<'EOF'
+import hashlib, hmac, json, time, urllib.parse, urllib.request
 
-# Register an admin user via Synapse-compatible HMAC
-NONCE=$(curl -ks https://localhost/_synapse/admin/v1/register | python3 -c 'import sys,json; print(json.load(sys.stdin)["nonce"])')
-MAC=$(printf '%s\0alice\0alicepass\0admin' "$NONCE" | openssl dgst -sha1 -hmac "$REG_SECRET" -hex | awk '{print $NF}')
-TOKEN=$(curl -ks -X POST https://localhost/_synapse/admin/v1/register \
-  -H 'Content-Type: application/json' \
-  -d "{\"nonce\":\"$NONCE\",\"username\":\"alice\",\"password\":\"alicepass\",\"admin\":true,\"mac\":\"$MAC\"}" \
-  | python3 -c 'import sys,json; print(json.load(sys.stdin)["access_token"])')
+USERNAME, PASSWORD = "matrix-admin", "change-me"
+HOMESERVER = "http://tuwunel.internal:6167"
+SHARED = "/var/lib/waldur/matrix"  # the waldur_matrix_secrets volume
 
-# Locate the admin room Tuwunel auto-joins the admin user to
-ROOM=$(curl -ks -H "Authorization: Bearer $TOKEN" https://localhost/_matrix/client/v3/joined_rooms \
-  | python3 -c 'import sys,json; print(json.load(sys.stdin)["joined_rooms"][0])')
-ROOM_ENC=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$ROOM', safe=''))")
+if PASSWORD == "change-me":
+    raise SystemExit("Set PASSWORD at the top of this script before running it")
+
+
+def call(method, path, body=None, token=None):
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    data = None if body is None else json.dumps(body).encode()
+    request = urllib.request.Request(HOMESERVER + path, data, headers, method=method)
+    with urllib.request.urlopen(request) as response:
+        return json.load(response)
+
+
+secrets = dict(line.split("=", 1) for line in open(f"{SHARED}/secrets.env").read().split())
+
+# Register the admin via Synapse-compatible HMAC
+nonce = call("GET", "/_synapse/admin/v1/register")["nonce"]
+message = "\0".join([nonce, USERNAME, PASSWORD, "admin"]).encode()
+mac = hmac.new(secrets["REG_TOKEN"].encode(), message, hashlib.sha1).hexdigest()
+admin = call("POST", "/_synapse/admin/v1/register", {
+    "nonce": nonce, "username": USERNAME, "password": PASSWORD, "admin": True, "mac": mac,
+})
+token, user_id = admin["access_token"], admin["user_id"]
+
+# The admin joins the admin room, #admins:<server name>
+alias = urllib.parse.quote("#admins:" + user_id.split(":", 1)[1])
+room = urllib.parse.quote(call("GET", f"/_matrix/client/v3/directory/room/{alias}")["room_id"])
 
 # Post the !admin appservices register command with the rendered descriptor
-YAML=$(docker run --rm -v waldur-docker-compose_waldur_matrix_secrets:/m alpine cat /m/waldur-registration.yaml)
-BODY=$(python3 -c "import json; yaml='''$YAML'''; print(json.dumps({'msgtype':'m.text','body':'!admin appservices register\n\`\`\`yaml\n'+yaml+'\n\`\`\`'}))")
-curl -ks -X PUT -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  --data-binary "$BODY" \
-  "https://localhost/_matrix/client/v3/rooms/$ROOM_ENC/send/m.room.message/$(date +%s%N)"
+descriptor = open(f"{SHARED}/waldur-registration.yaml").read()
+sent = call("PUT", f"/_matrix/client/v3/rooms/{room}/send/m.room.message/setup-{time.time_ns()}", {
+    "msgtype": "m.text", "body": f"!admin appservices register\n```yaml\n{descriptor}\n```",
+}, token)
 
-# Confirm Tuwunel acknowledged
-curl -ks -H "Authorization: Bearer $TOKEN" \
-  "https://localhost/_matrix/client/v3/rooms/$ROOM_ENC/messages?dir=b&limit=2" \
-  | python3 -c "import sys,json; print([c.get('content',{}).get('body','')[:80] for c in json.load(sys.stdin).get('chunk',[])])"
-# Expect: ['Appservice registered with ID: waldur', '...']
+
+def reply():
+    messages = call("GET", f"/_matrix/client/v3/rooms/{room}/messages?dir=b&limit=10", token=token)
+    for event in messages["chunk"]:
+        if event["event_id"] == sent["event_id"]:
+            return None
+        if event["type"] == "m.room.message" and event["sender"] != user_id:
+            return event["content"]["body"]
+
+
+# Tuwunel answers asynchronously
+for _ in range(10):
+    time.sleep(1)
+    if text := reply():
+        print(text)
+        break
+else:
+    print("No reply yet; read the admin room in a Matrix client")
+EOF
+# Expect: Appservice registered with ID: waldur
 ```
 
 The bot then becomes `@waldur-bot:<your-domain>` and can post on Waldur's behalf.
 
-**Prefer Element Web?** Set `WALDUR_MATRIX_OPEN_REGISTRATION=true` in `.env` before the first `--profile matrix up -d`, then register the admin user via the Element Web sign-up form using `REG_TOKEN` from the secrets volume. Switch the flag back to `false` afterwards (re-render takes effect on the next `--profile matrix up -d`).
+The admin must be created this way, with `"admin": true`. Tuwunel runs with `grant_admin_to_first_user = false`, so no account becomes an admin just by being the first one. Otherwise Waldur, which registers an account for whoever opens the chat first, could hand a user the homeserver's admin room. Once created, the admin can sign in to Element Web with that username and password.
+
+On an existing deployment, `grant_admin_to_first_user = false` demotes nobody: whoever became admin as the first account stays one. Tuwunel treats every member of the admin room (`#admins:<WALDUR_DOMAIN>`) as an admin, so check its members in a Matrix client as the admin.
+
+`/_synapse/admin/*` is not served through Caddy, which answers it with `404`; Waldur reaches the admin API on the internal network (`MATRIX_HOMESERVER_URL`).
 
 ## The Matrix bot
 
@@ -129,7 +166,7 @@ device, can read the original's rooms, and corrupts both bots' sessions.
 
 ## Enabling the homeport UI
 
-Backend access to Matrix is gated by the `MATRIX_ENABLED` Constance flag (auto-set by `waldur-matrix-init`). The homeport UI is gated separately by a feature flag — enable it once via the `load_features` management command:
+Backend access to Matrix is gated by the `MATRIX_ENABLED` Constance flag. `waldur-matrix-init` turns it on the first time; switched off in Waldur, it stays off across later `up` runs. The homeport UI is gated separately by a feature flag — enable it once via the `load_features` management command:
 
 ```bash
 docker exec waldur-mastermind-worker bash -c \
@@ -165,7 +202,7 @@ docker compose restart tuwunel
 
 `WALDUR_LIVEKIT_NODE_IP` advertises the host's RTC media address to clients. The default `127.0.0.1` is correct for a local demo only — for any reachable deployment, set this to the host's external IP or DNS name so remote clients can connect. The RTC media ports (`WALDUR_MATRIX_RTC_TCP_PORT`/`UDP_PORT`, default 7881/7882) must also be reachable from clients.
 
-`WALDUR_LIVEKIT_KEY` / `WALDUR_LIVEKIT_SECRET` default to development values. **Override both** for anything beyond a localhost demo. Use a secret of at least 32 characters; LiveKit logs an error at startup for anything shorter.
+`WALDUR_LIVEKIT_KEY` / `WALDUR_LIVEKIT_SECRET` default to development values. Anyone who knows them can mint a token for any call, so **override both** for anything beyond a local demo, with a secret of at least 32 characters. With `--profile matrix-rtc` and a `WALDUR_DOMAIN` other than `localhost` or `host.docker.internal`, the one-shot `livekit-credentials-check` refuses the development values or a shorter secret, and `docker compose up -d` fails with `service "livekit-credentials-check" didn't complete successfully`. `livekit` and `lk-jwt-service`, which wait for the check, do not start. The failed command can also leave other services unstarted: on a first start, or after `docker compose down`, the API, the workers, HomePort, Caddy and the homeserver stay down, so Waldur itself is down, not only calls, while the database migration may still have run. Services that were running and that this `up` does not change keep running. Set `WALDUR_LIVEKIT_KEY` and `WALDUR_LIVEKIT_SECRET` in `.env`, or turn calls off again (`WALDUR_MATRIX_RTC_ENABLED=false` and no `--profile matrix-rtc`), and run `up -d` again.
 
 **Calls need a `WALDUR_DOMAIN` that resolves to the host from inside containers.** `lk-jwt-service` shares Tuwunel's network namespace and verifies each caller's Matrix OpenID token with a federation lookup of the homeserver named `WALDUR_DOMAIN`. With `WALDUR_DOMAIN=localhost` that lookup dials `localhost:443` and `localhost:8448` inside the namespace, where nothing listens, so every call token request fails and calls never start. Chat is unaffected. Use a DNS name that points at the host, or `host.docker.internal` for a local demo on Docker Desktop. Choose it before the first start, because `WALDUR_DOMAIN` is frozen once the homeserver has data (see Pinned image tags above).
 

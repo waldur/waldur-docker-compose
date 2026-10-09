@@ -25,6 +25,11 @@ registration_token = "@@REG_TOKEN@@"
 # /_synapse/admin/v1/register with HMAC-SHA1 of the returned nonce keyed by it.
 registration_shared_secret = "@@REG_TOKEN@@"
 
+# Otherwise the first account on the server becomes its admin, and Waldur
+# registers an account for whoever opens the chat first. The setup in the docs
+# creates the admin explicitly ("admin": true).
+grant_admin_to_first_user = false
+
 max_request_size = 104857600
 
 # Waldur's chat drawer signs in with a refresh token, so its access tokens
