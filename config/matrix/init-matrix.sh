@@ -9,6 +9,11 @@
 
 set -euo pipefail
 
+# Every file written here holds a token or secret (tuwunel.toml the
+# registration token, waldur-registration.yaml both appservice tokens), and
+# only this script's user and the homeserver, running as root, read them.
+umask 077
+
 TEMPLATES=/etc/waldur/matrix
 SHARED=/var/lib/waldur/matrix
 SECRETS="${SHARED}/secrets.env"
@@ -19,7 +24,6 @@ if [[ ! -f "${SECRETS}" ]]; then
 	AS_TOKEN="$(openssl rand -hex 32)"
 	HS_TOKEN="$(openssl rand -hex 32)"
 	REG_TOKEN="$(openssl rand -hex 32)"
-	umask 077
 	cat > "${SECRETS}" <<-EOF
 		AS_TOKEN=${AS_TOKEN}
 		HS_TOKEN=${HS_TOKEN}
@@ -36,6 +40,11 @@ source "${SECRETS}"
 SERVER_NAME="${WALDUR_DOMAIN:-localhost}"
 LOCALPART="${WALDUR_MATRIX_BOT_LOCALPART:-waldur-bot}"
 OPEN_REG="${WALDUR_MATRIX_OPEN_REGISTRATION:-false}"
+# Substituted into tuwunel.toml by sed, so only the two literals are accepted.
+if [[ "${OPEN_REG}" != "true" && "${OPEN_REG}" != "false" ]]; then
+	echo "matrix-init: WALDUR_MATRIX_OPEN_REGISTRATION must be true or false" >&2
+	exit 1
+fi
 RTC_ENABLED="${WALDUR_MATRIX_RTC_ENABLED:-false}"
 LOGIN_WITH_PASSWORD="${WALDUR_MATRIX_LOGIN_WITH_PASSWORD:-true}"
 if [[ "${LOGIN_WITH_PASSWORD}" != "true" && "${LOGIN_WITH_PASSWORD}" != "false" ]]; then
