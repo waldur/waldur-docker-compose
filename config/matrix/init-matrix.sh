@@ -2,10 +2,10 @@
 # Bootstraps the Matrix add-on inside waldur-docker-compose.
 #
 # Idempotent: generates AS/HS/registration tokens once into a shared volume,
-# renders the tuwunel.toml and the appservice descriptor that Tuwunel
-# operators paste into the !admin admin room, then seeds Constance via the
-# existing `override_constance_settings` management command (same pattern
-# as init-whitelabeling).
+# renders the tuwunel.toml, seeds Constance via mastermind's
+# `init_matrix_settings` management command, and renders the appservice
+# descriptor that operators register in Tuwunel's admin room with
+# `!admin appservices register` (see docs/matrix-chat-add-on.md).
 
 set -euo pipefail
 
@@ -33,6 +33,15 @@ fi
 # shellcheck disable=SC1090
 source "${SECRETS}"
 
+# A hand-edited file (a rotation) could lose a key; seeding an empty token
+# would only fail later, as M_UNKNOWN_TOKEN on every bot call.
+for key in AS_TOKEN HS_TOKEN REG_TOKEN; do
+	if [[ -z "${!key:-}" ]]; then
+		echo "matrix-init: ${SECRETS} has no ${key}; restore it or remove the file to generate new tokens" >&2
+		exit 1
+	fi
+done
+
 SERVER_NAME="${WALDUR_DOMAIN:-localhost}"
 LOCALPART="${WALDUR_MATRIX_BOT_LOCALPART:-waldur-bot}"
 OPEN_REG="${WALDUR_MATRIX_OPEN_REGISTRATION:-false}"
@@ -58,35 +67,44 @@ awk -v block="${RTC_BLOCK}" '{ gsub(/@@RTC_BLOCK@@/, block); print }' \
 	"${SHARED}/tuwunel.toml.tmp" > "${SHARED}/tuwunel.toml"
 rm -f "${SHARED}/tuwunel.toml.tmp"
 
-# Render appservice descriptor (the YAML the operator pastes into Tuwunel's
-# admin room via `!admin appservices register`).
-sed \
-	-e "s|@@AS_TOKEN@@|${AS_TOKEN}|g" \
-	-e "s|@@HS_TOKEN@@|${HS_TOKEN}|g" \
-	-e "s|@@SERVER_NAME@@|${SERVER_NAME}|g" \
-	-e "s|@@LOCALPART@@|${LOCALPART}|g" \
-	"${TEMPLATES}/waldur-registration.yaml.template" > "${SHARED}/waldur-registration.yaml"
-
-# Render Constance overrides and apply via the existing management command.
+# Seed Constance through mastermind's `init_matrix_settings`, which the Helm
+# chart calls with these same variable names. Two reasons it is not
+# `override_constance_settings` like init-whitelabeling:
+#
+#   * that command drops any key the serializer rejects and still exits 0, so a
+#     malformed URL or a truncated token brings the stack up looking configured
+#     and fails every bot call later with M_UNKNOWN_TOKEN;
+#   * it refuses to replace appservice tokens that were configured by hand
+#     (through the Setup wizard), which the homeserver may be registered with.
+#
+# Exported rather than written to a file because these are generated secrets,
+# and the exports live only in this process, not in the container's config.
+#
 # Backend bot HTTP calls use MATRIX_HOMESERVER_URL (Docker DNS, internal).
 # Browser clients reach the homeserver via Caddy at MATRIX_HOMESERVER_PUBLIC_URL
 # — Django URLValidator rejects single-word hostnames so the internal value
 # uses the `tuwunel.internal` network alias defined in docker-compose.yml.
-waldur override_constance_settings /dev/stdin <<-EOF
-	MATRIX_HOMESERVER_URL: http://tuwunel.internal:6167
-	MATRIX_HOMESERVER_PUBLIC_URL: https://${SERVER_NAME}
-	MATRIX_HOMESERVER_DOMAIN: ${SERVER_NAME}
-	MATRIX_APPSERVICE_AS_TOKEN: ${AS_TOKEN}
-	MATRIX_APPSERVICE_HS_TOKEN: ${HS_TOKEN}
-	MATRIX_APPSERVICE_SENDER_LOCALPART: ${LOCALPART}
-	MATRIX_USER_REGISTRATION_SECRET: ${REG_TOKEN}
-EOF
+#
+# MATRIX_ENABLED is deliberately not exported. `init_matrix_settings` switches
+# chat on at the first seed (while MATRIX_TOKENS_MANAGED_BY is blank and no
+# appservice token is stored) and leaves it alone on every later run, but an
+# environment value applies on every run: an admin who turned chat off would
+# find it back on after the next `up`.
+export MATRIX_HOMESERVER_URL=http://tuwunel.internal:6167
+export MATRIX_HOMESERVER_PUBLIC_URL="https://${SERVER_NAME}"
+export MATRIX_HOMESERVER_DOMAIN="${SERVER_NAME}"
+export MATRIX_APPSERVICE_AS_TOKEN="${AS_TOKEN}"
+export MATRIX_APPSERVICE_HS_TOKEN="${HS_TOKEN}"
+export MATRIX_APPSERVICE_SENDER_LOCALPART="${LOCALPART}"
+export MATRIX_USER_REGISTRATION_SECRET="${REG_TOKEN}"
+
+waldur init_matrix_settings
 
 # LiveKit settings Waldur issues call tokens with: the signaling URL browsers
 # dial through Caddy, the room API on the `livekit.internal` alias, and the
 # key and secret LiveKit verifies the tokens with. JSON is valid YAML and
 # quotes whatever the key and secret contain. Piped rather than written to a
-# temp file, like the settings above.
+# temp file, so the secret never lands on disk.
 if [[ "${RTC_ENABLED}" == "true" ]]; then
 	MATRIX_LIVEKIT_PUBLIC_URL="wss://${SERVER_NAME}/livekit" \
 		python3 -c 'import json, os; print(json.dumps({
@@ -97,13 +115,46 @@ if [[ "${RTC_ENABLED}" == "true" ]]; then
 }))' | waldur override_constance_settings /dev/stdin
 fi
 
-# Seeded, not overridden: an administrator who switches chat off keeps it off
-# across the next `up`.
-ENABLED_YAML="$(mktemp)"
-echo "MATRIX_ENABLED: true" > "${ENABLED_YAML}"
-waldur override_constance_settings --if-unset "${ENABLED_YAML}"
-rm -f "${ENABLED_YAML}"
+# The descriptor to register in Tuwunel's admin room. Rendered by mastermind
+# from the settings just seeded, so it declares the namespaces Waldur uses,
+# room aliases included.
+#
+# A failure here is a warning: it must not keep Tuwunel from starting.
+# Rendered to a temporary file and checked before it replaces the old one.
+# Mastermind logs to stdout too, as one JSON object per line (a warning about
+# FIELD_ENCRYPTION_KEY, say), so those lines are dropped and the rest must
+# parse as the descriptor.
+DESCRIPTOR="${SHARED}/waldur-registration.yaml"
+umask 077
+if waldur generate_appservice_registration \
+	--url "${WALDUR_MATRIX_APPSERVICE_URL:-http://waldur-mastermind-api:8080}" \
+	> "${DESCRIPTOR}.out" &&
+	python3 -c '
+import json, sys, yaml
+
+def is_log(line):
+    try:
+        return isinstance(json.loads(line), dict)
+    except ValueError:
+        return False
+
+with open(sys.argv[1]) as f:
+    text = "".join(line for line in f if not is_log(line))
+doc = yaml.safe_load(text)
+if not (isinstance(doc, dict) and doc.get("id") == "waldur"):
+    sys.exit(1)
+with open(sys.argv[2], "w") as f:
+    f.write(text)
+' "${DESCRIPTOR}.out" "${DESCRIPTOR}.tmp" 2>/dev/null; then
+	rm -f "${DESCRIPTOR}.out"
+	mv "${DESCRIPTOR}.tmp" "${DESCRIPTOR}"
+	echo "matrix-init: appservice descriptor at ${DESCRIPTOR} — register it in Tuwunel's admin room with '!admin appservices register'"
+else
+	# An older descriptor may hold tokens that were rotated since; registering
+	# it would put the homeserver and Waldur out of step again.
+	rm -f "${DESCRIPTOR}.out" "${DESCRIPTOR}.tmp" "${DESCRIPTOR}"
+	echo "matrix-init: WARNING: could not render the appservice descriptor, so ${DESCRIPTOR} is absent; see the waldur-matrix-init log" >&2
+fi
 
 echo "matrix-init: Constance seeded. Rendered files in ${SHARED}:"
 ls -l "${SHARED}"
-echo "matrix-init: appservice descriptor at ${SHARED}/waldur-registration.yaml — paste this into Tuwunel's admin room via '!admin appservices register'"
