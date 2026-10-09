@@ -71,7 +71,6 @@ sed \
 # uses the `tuwunel.internal` network alias defined in docker-compose.yml.
 CONSTANCE_YAML="$(mktemp)"
 cat > "${CONSTANCE_YAML}" <<-EOF
-	MATRIX_ENABLED: true
 	MATRIX_HOMESERVER_URL: http://tuwunel.internal:6167
 	MATRIX_HOMESERVER_PUBLIC_URL: https://${SERVER_NAME}
 	MATRIX_HOMESERVER_DOMAIN: ${SERVER_NAME}
@@ -83,6 +82,13 @@ EOF
 
 waldur override_constance_settings "${CONSTANCE_YAML}"
 rm -f "${CONSTANCE_YAML}"
+
+# Seeded, not overridden: an administrator who switches chat off keeps it off
+# across the next `up`.
+ENABLED_YAML="$(mktemp)"
+echo "MATRIX_ENABLED: true" > "${ENABLED_YAML}"
+waldur override_constance_settings --if-unset "${ENABLED_YAML}"
+rm -f "${ENABLED_YAML}"
 
 echo "matrix-init: Constance seeded. Rendered files in ${SHARED}:"
 ls -l "${SHARED}"

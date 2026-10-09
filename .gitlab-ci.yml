@@ -72,10 +72,13 @@ Test compose configuration:
     # Using `docker` host due to docker networking model:
     # Accessing directly to the `dind` service
     - curl -k -i https://docker | grep 200
+    - 'curl -k -i https://docker | grep -i "strict-transport-security: max-age=31536000"'
     - curl -k -i https://docker/api/ | grep 401
     - curl -X POST -d '{"username":"admin","password":"password" }' -H "Content-type:application/json" -k -i https://docker/api-auth/password/ | grep 200
     # /scim/ must reach mastermind (SCIM JSON), not fall through to homeport (HTML)
     - 'curl -k -i https://docker/scim/v2/ServiceProviderConfig | grep -i "content-type: application/scim+json"'
+    # /_synapse/admin/ is not proxied to the homeserver: Caddy answers 404 itself
+    - 'curl -k -i https://docker/_synapse/admin/v1/register | grep "^HTTP/[0-9.]* 404"'
   before_script:
     - apk add curl
     - |
