@@ -173,7 +173,10 @@ refuses a missing issuer, client ID or secret, a `WALDUR_MATRIX_SSO_ENABLED`
 other than `true` or `false`, a name with quotes, backslashes or control
 characters, a client ID or brand with anything but letters, digits, `.`, `_`
 and `-`, an issuer that is not an `https://` URL, and an unrecognised claim.
-The homeserver is configured so SSO lands in Waldur's account:
+It also refuses single sign-on together with
+`WALDUR_MATRIX_OPEN_REGISTRATION=true`: with `trusted`, anyone could register
+`@bob` first and receive bob's SSO login. The homeserver is configured so SSO
+lands in Waldur's account:
 
 - `name` is `WALDUR_MATRIX_SSO_NAME`, the label of the login button.
   `brand` is `WALDUR_MATRIX_SSO_BRAND`, the kind of IdP (`keycloak`, `github`,
@@ -188,7 +191,10 @@ The homeserver is configured so SSO lands in Waldur's account:
   certificate from a public CA, not `TLS=internal`.
 - `userid_claims` is `WALDUR_MATRIX_SSO_USERID_CLAIM`, one of `sub`,
   `preferred_username`, `username`, `nickname`, `email` (its local part) or
-  `login` (GitHub). It must be the claim Waldur's identity provider uses as
+  `login` (GitHub). `email` is refused unless
+  `WALDUR_MATRIX_SSO_ALLOW_EMAIL_CLAIM=true`: only the local part is used, so
+  `alice@a.org` and `alice@b.org` would sign in to the same account; set it
+  only if the IdP issues addresses of a single domain. It must be the claim Waldur's identity provider uses as
   `user_claim`, with that provider's `user_field` left at `username` and
   `MATRIX_USER_ID_FORMAT=username`, and its values must already be valid
   Matrix localparts (lowercase letters, digits, `. _ = - / +`). Users with a
