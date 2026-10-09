@@ -219,7 +219,7 @@ With `WALDUR_MATRIX_RTC_ENABLED=true`, the homeserver's `.well-known/matrix/clie
 
 Element (Web, Desktop and mobile, through Element Call) and Waldur's chat drawer both read it and ask Waldur for a LiveKit token: `POST /api/matrix/livekit/get_token`, or the legacy `/api/matrix/livekit/sfu/get` that Element Call falls back to. Waldur verifies the caller's Matrix OpenID token with the homeserver at `http://tuwunel.internal:6167`, checks that the caller is joined to the room now and that the device is theirs, and answers with `wss://${WALDUR_DOMAIN}/livekit` and a token for that room only. Anyone else gets `403`.
 
-`waldur-matrix-init` seeds the settings Waldur needs on every `up`: `MATRIX_LIVEKIT_PUBLIC_URL` (`wss://${WALDUR_DOMAIN}/livekit`), `MATRIX_LIVEKIT_URL` (`http://livekit.internal:7880`, the room API on the Compose network) and `MATRIX_LIVEKIT_KEY` / `MATRIX_LIVEKIT_SECRET` (from `WALDUR_LIVEKIT_KEY` / `WALDUR_LIVEKIT_SECRET`).
+`waldur-matrix-init` seeds the settings Waldur needs on every `up`: `MATRIX_LIVEKIT_PUBLIC_URL` (`wss://${WALDUR_DOMAIN}/livekit`), `MATRIX_LIVEKIT_URL` (`http://livekit.internal:7880`, the room API on the Compose network) and `MATRIX_LIVEKIT_KEY` / `MATRIX_LIVEKIT_SECRET` (from `WALDUR_LIVEKIT_KEY` / `WALDUR_LIVEKIT_SECRET`). Caddy routes only LiveKit's signaling under `/livekit/`: its room API (`/livekit/twirp/`) answers `404` from outside, since Waldur reaches it on the Compose network.
 
 Element calls these endpoints from another origin. Waldur answers them with `Access-Control-Allow-Origin: *` and no credentials, and the `Caddyfile` keeps its site-wide CORS headers (the request's origin plus credentials) off `/api/matrix/livekit/`, so the two never collide.
 
