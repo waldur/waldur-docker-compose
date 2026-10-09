@@ -26,8 +26,8 @@ registration_token = "@@REG_TOKEN@@"
 
 # Synapse-compatible shared-secret register endpoint (Tuwunel 1.7.0+): POST
 # /_synapse/admin/v1/register with HMAC-SHA1 of the returned nonce keyed by it.
-# waldur-matrix-register creates the bootstrap admin through it, and operators
-# create other admins the same way.
+# The setup in docs/matrix-chat-add-on.md creates the homeserver admin through
+# it, on the internal network.
 registration_shared_secret = "@@REG_TOKEN@@"
 
 # Otherwise the first account on the server becomes its admin, and Waldur
