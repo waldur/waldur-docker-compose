@@ -75,9 +75,12 @@ docker logs waldur-matrix-register
 # Expect: Appservice 'waldur' registered on the homeserver.
 ```
 
-`up -d` returns before registration is done: nothing depends on the register
-container, and it may still be waiting for the homeserver. Read its log once
-`docker wait` has returned.
+`waldur-matrix-bot` (added on develop) depends on the register container
+completing successfully, so once that service is in the stack, `up -d` blocks
+until registration is done, including any wait for the homeserver. Without it,
+`up -d` returns before registration is done, and the container may still be
+waiting for the homeserver. Either way, read its log once `docker wait` has
+returned.
 
 The register container waits for the homeserver before it does anything, up to
 `WALDUR_MATRIX_REGISTER_WAIT_SECONDS` (default one hour), logging every 30 s.
