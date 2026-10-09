@@ -229,22 +229,18 @@ export MATRIX_APPSERVICE_HS_TOKEN="${HS_TOKEN}"
 export MATRIX_APPSERVICE_SENDER_LOCALPART="${LOCALPART}"
 export MATRIX_USER_REGISTRATION_SECRET="${REG_TOKEN}"
 
-waldur init_matrix_settings
-
 # LiveKit settings Waldur issues call tokens with: the signaling URL browsers
 # dial through Caddy, the room API on the `livekit.internal` alias, and the
-# key and secret LiveKit verifies the tokens with. JSON is valid YAML and
-# quotes whatever the key and secret contain. Piped rather than written to a
-# temp file, so the secret never lands on disk.
+# key and secret LiveKit verifies the tokens with. Seeded only with calls on;
+# without them the stored values are left as they are.
 if [[ "${RTC_ENABLED}" == "true" ]]; then
-	MATRIX_LIVEKIT_PUBLIC_URL="wss://${SERVER_NAME}/livekit" \
-		python3 -c 'import json, os; print(json.dumps({
-	"MATRIX_LIVEKIT_PUBLIC_URL": os.environ["MATRIX_LIVEKIT_PUBLIC_URL"],
-	"MATRIX_LIVEKIT_URL": "http://livekit.internal:7880",
-	"MATRIX_LIVEKIT_KEY": os.environ.get("WALDUR_LIVEKIT_KEY") or "devkey",
-	"MATRIX_LIVEKIT_SECRET": os.environ.get("WALDUR_LIVEKIT_SECRET") or "devsecret",
-}))' | waldur override_constance_settings /dev/stdin
+	export MATRIX_LIVEKIT_PUBLIC_URL="wss://${SERVER_NAME}/livekit"
+	export MATRIX_LIVEKIT_URL=http://livekit.internal:7880
+	export MATRIX_LIVEKIT_KEY="${WALDUR_LIVEKIT_KEY:-devkey}"
+	export MATRIX_LIVEKIT_SECRET="${WALDUR_LIVEKIT_SECRET:-devsecret}"
 fi
+
+waldur init_matrix_settings
 
 # The descriptor for registering by hand (WALDUR_MATRIX_REGISTER_APPSERVICE=false).
 # Rendered by mastermind from the settings just seeded, so it declares the same
