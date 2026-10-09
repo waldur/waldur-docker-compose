@@ -36,6 +36,12 @@ max_request_size = 104857600
 access_token_ttl = 300
 refresh_token_ttl = 86400
 
+# Media is served from the same origin as Waldur's web UI here, and only ever
+# shown through the chat clients: refuse to be framed, and allow no inline
+# styles in media served as documents (e.g. SVG).
+media_deny_framing = true
+media_deny_inline_styles = true
+
 # Federation must be ON for lk-jwt-service to verify Matrix OpenID tokens
 # via /_matrix/federation/v1/openid/userinfo (used during the call
 # token exchange). Disabling federation breaks calls.
