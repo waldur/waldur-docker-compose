@@ -62,6 +62,10 @@ setup, so make sure you understand what you are doing.
 
 ## Upgrading Waldur
 
+Your `.env` keeps the image tags it was copied with. First set
+`WALDUR_MASTERMIND_IMAGE_TAG` and `WALDUR_HOMEPORT_IMAGE_TAG` to the versions
+`.env.example` pins: the files of a release expect the images of that release.
+
 ```bash
 docker compose pull
 docker compose down
@@ -375,7 +379,7 @@ http://keycloak:8080/auth/realms/<YOUR REALM>/.well-known/openid-configuration
 
 ## Matrix chat add-on
 
-Two optional Compose profiles bring up a self-contained Matrix homeserver alongside Waldur — `matrix` for chat and `matrix-rtc` for voice/video calls. Activation, the one-time appservice registration, troubleshooting, and the rest of the operator guide live in `docs/matrix-chat-add-on.md` in this repo, and on the Waldur docs site under the docker-compose deployment guide.
+Two optional Compose profiles bring up a self-contained Matrix homeserver alongside Waldur — `matrix` for chat and `matrix-rtc` for voice/video calls. Activation, the automatic appservice registration, token rotation, troubleshooting, and the rest of the operator guide live in `docs/matrix-chat-add-on.md` in this repo, and on the Waldur docs site under the docker-compose deployment guide.
 
 ## Web shell (development only)
 
