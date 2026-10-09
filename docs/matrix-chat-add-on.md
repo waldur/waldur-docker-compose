@@ -340,12 +340,7 @@ Waldur, into the account Waldur provisioned for them.
 explains how the accounts line up and why the homeserver is configured this
 way; this section covers the compose settings.
 
-Set the method under **Administration → Configuration → Matrix chat →
-Settings**, and next to it `MATRIX_SSO_REGISTRATION_METHOD` to the name of the
-Waldur identity provider the homeserver's single sign-on uses, such as
-`keycloak`. Waldur gives a Matrix account only to users who signed up through
-that provider, and while the setting is blank, to nobody. Compose seeds neither. Register a client at the IdP with the
-redirect URI
+Register a client at the IdP with the redirect URI
 `https://<WALDUR_DOMAIN>/_matrix/client/unstable/login/sso/callback/<client id>`,
 then set in `.env`:
 
@@ -359,16 +354,26 @@ WALDUR_MATRIX_SSO_CLIENT_ID=matrix-homeserver
 WALDUR_MATRIX_SSO_CLIENT_SECRET=<secret>
 WALDUR_MATRIX_SSO_USERID_CLAIM=sub
 WALDUR_MATRIX_SSO_FORBIDDEN_USERNAMES=matrix-admin
+WALDUR_MATRIX_SSO_REGISTRATION_METHOD=keycloak
 ```
 
 and run `docker compose --profile matrix up -d`, which re-renders the homeserver
 configuration and recreates `tuwunel`. After changing only
 `WALDUR_MATRIX_SSO_CLIENT_SECRET`, also run `docker compose restart tuwunel`.
 
+With single sign-on on, `waldur-matrix-init` also seeds Waldur's
+`MATRIX_EXTERNAL_LOGIN_METHOD` as `oidc` and `MATRIX_SSO_REGISTRATION_METHOD`
+from `WALDUR_MATRIX_SSO_REGISTRATION_METHOD`: the name of the Waldur identity
+provider this IdP is, such as `keycloak`. Waldur gives a Matrix account only to
+users who signed up through that provider. Both are seeded on every `up`, so
+while single sign-on is on, a method changed in Administration goes back to
+`oidc`. With single sign-on off it seeds neither, so a method set under
+**Administration → Configuration → Matrix chat → Settings** stays as it is.
+
 `waldur-matrix-init` writes the client secret to `sso_client_secret` in the
 secrets volume, not into `tuwunel.toml`. It checks the settings before it
 renders anything, and a refused run keeps the previous configuration. It
-refuses a missing issuer, client ID or secret, a `WALDUR_MATRIX_SSO_ENABLED`
+refuses a missing issuer, client ID, secret or registration method, a `WALDUR_MATRIX_SSO_ENABLED`
 other than `true` or `false`, a name with quotes, backslashes or control
 characters, a client ID or brand with anything but letters, digits, `.`, `_`
 and `-`, an issuer that is not an `https://` URL, and an unrecognised claim.
