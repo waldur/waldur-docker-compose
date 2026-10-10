@@ -195,9 +195,11 @@ On that network Waldur and the homeserver call each other over plain HTTP (`http
 
 The `matrix` profile also starts `waldur-matrix-bot`, Waldur's member of every
 Waldur room. It runs on a Matrix device of its own and holds that device's
-keys, so it is the only process that can post into an encrypted room or read
-the commands sent to it there. While it runs, every message Waldur sends as the
-bot goes through it. It needs the appservice registered (above): until then it
+keys. Every Waldur room is encrypted, so it is the only process that can post
+into them: every message Waldur sends as the bot waits in `waldur-db` until the
+bot posts it. Clients share their room keys with its device as with any
+member's, so it decrypts every message in those rooms, not only the commands
+sent to it. It needs the appservice registered (above): until then it
 restarts with a sign-in error. It also needs to be a homeserver admin (above)
 for the drawer's encryption reset and for locking users deactivated in Waldur.
 
