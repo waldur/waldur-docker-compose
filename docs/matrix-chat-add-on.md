@@ -482,6 +482,241 @@ docker compose exec livekit sh -c 'ss -lun | grep :443 || netstat -lun | grep :4
 
 Coverage note: TURN/UDP rescues symmetric-NAT clients and any network that permits outbound UDP on 443. It does **not** help clients on networks that block all outbound UDP (strict corporate firewalls) — that requires TURN/TLS on TCP 443, which on a single host means giving LiveKit its own IP or a layer-4 load balancer (the helm topology). For a single-host compose deployment, TURN/UDP is the pragmatic option.
 
+## Monitoring
+
+The stack runs neither the metrics exporter nor Prometheus. To watch chat
+health from outside Waldur, run
+[waldur-prometheus-exporter](https://github.com/waldur/waldur-prometheus-exporter)
+next to the stack and load the rules below into your Prometheus.
+
+The exporter calls Waldur's Matrix diagnostics,
+`GET /api/admin/matrix/diagnostics/`, about every two minutes and publishes:
+
+| Metric | Labels | Value |
+| --- | --- | --- |
+| `waldur_matrix_diagnostics_up` | | `1` if the last diagnostics call succeeded, `0` if it failed |
+| `waldur_matrix_check_passed` | `check` | `1` if the diagnostics check passed, `0` if not, e.g. `homeserver_reachable`, `bot_running`, `bot_whoami`, `appservice_ping` |
+| `waldur_matrix_rooms` | `state` | Rooms per state: `creating`, `active`, `disabling`, `archived`, `error` |
+
+The exporter needs the API token of a support or staff user. If every call
+gets `403`, the token belongs to neither, or Waldur is too old to let support
+users read diagnostics and needs a staff user's token;
+`waldur_matrix_diagnostics_up` then stays `0`.
+
+### Running the exporter
+
+Put the exporter in a `docker-compose.override.yml` next to
+`docker-compose.yml`, which `docker compose` reads unless `-f` names the files,
+and set `WALDUR_METRICS_EXPORTER_TOKEN` in `.env` to the API token of a
+support or staff user:
+
+```yaml
+services:
+  waldur-metrics-exporter:
+    container_name: waldur-metrics-exporter
+    image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-prometheus-exporter:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    environment:
+      # The API's address inside the stack, as the appservice uses it.
+      - WALDUR_API_URL=http://waldur-mastermind-api:8080/api/
+      - WALDUR_API_TOKEN=${WALDUR_METRICS_EXPORTER_TOKEN}
+    ports:
+      # Where your Prometheus scrapes /metrics; widen the address if it runs
+      # on another host.
+      - '127.0.0.1:9180:8080'
+    restart: always
+```
+
+Then have Prometheus scrape it and load the [alert rules](#alert-rules) below,
+saved as `matrix-chat-alerts.yml` next to `prometheus.yml`:
+
+```yaml
+rule_files:
+  - matrix-chat-alerts.yml
+scrape_configs:
+  - job_name: waldur-metrics-exporter
+    scrape_interval: 60s
+    static_configs:
+      - targets: ['<docker host>:9180']
+```
+
+### Alert rules
+
+The same rules ship with the Helm chart as a `PrometheusRule`:
+
+<!-- Copied from waldur-helm's waldur/files/matrix-chat-alerts.yaml: change both together. -->
+
+```yaml
+groups:
+  - name: waldur-matrix-chat
+    rules:
+      # One series per Waldur, not per scrape target. On Kubernetes, where a
+      # target has a namespace label, a Waldur is a namespace and job: a
+      # replaced exporter pod is a new target, with another instance and other
+      # pod, node or chart version labels. Held per target, its predecessor's
+      # last value would stay beside the new pod's live one for 20 minutes,
+      # firing for a check that has recovered, and an alert would resolve and
+      # start over under the new labels. Elsewhere a target is a Waldur and
+      # keeps its labels, so several Waldurs in one job stay apart.
+      - record: waldur_matrix_check_passed:per_waldur
+        expr: >-
+          min by (namespace, job, check) (waldur_matrix_check_passed{namespace!=""})
+          or
+          waldur_matrix_check_passed{namespace=""}
+      - record: waldur_matrix_rooms:per_waldur
+        expr: >-
+          max by (namespace, job, state) (waldur_matrix_rooms{namespace!=""})
+          or
+          waldur_matrix_rooms{namespace=""}
+      # The exporter drops every check and room series when a diagnostics
+      # call fails, and Prometheus drops them while the exporter is down or
+      # restarting. Holding the last value for 20 minutes keeps that from
+      # resolving an alert or restarting its "for"; DiagnosticsDown and
+      # MetricsMissing fire before the hold runs out.
+      - record: waldur_matrix_check_passed:last20m
+        expr: >-
+          waldur_matrix_check_passed:per_waldur
+          or
+          last_over_time(waldur_matrix_check_passed:per_waldur[20m])
+      - record: waldur_matrix_rooms:last20m
+        expr: >-
+          waldur_matrix_rooms:per_waldur
+          or
+          last_over_time(waldur_matrix_rooms:per_waldur[20m])
+      - alert: WaldurMatrixMetricsMissing
+        expr: absent(waldur_matrix_diagnostics_up)
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: No Matrix chat metrics from the Waldur metrics exporter
+          description: >-
+            Prometheus has no waldur_matrix_diagnostics_up series: the metrics
+            exporter is down, is not scraped, or is a version without Matrix
+            metrics. None of the other Matrix chat alerts can fire until it is.
+      - alert: WaldurMatrixDiagnosticsDown
+        expr: waldur_matrix_diagnostics_up == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: The metrics exporter cannot read Waldur's Matrix diagnostics
+          description: >-
+            GET /api/admin/matrix/diagnostics/ has failed for 10 minutes, so the
+            Matrix chat checks are not updated. The exporter's token must belong
+            to a support or staff user: a 403 means it belongs to neither, or
+            that Waldur is too old to let support users read diagnostics.
+      # Diagnostics answers for a Waldur without Matrix chat too, with these
+      # checks failing. This alert and BotNotRunning stay quiet where no
+      # homeserver URL is set, so such a Waldur on the same Prometheus does not
+      # raise them; the sign-in and ping alerts are quiet there already.
+      - alert: WaldurMatrixHomeserverUnreachable
+        expr: >-
+          waldur_matrix_check_passed:last20m{check="homeserver_reachable"} == 0
+          unless ignoring(check)
+          waldur_matrix_check_passed:last20m{check="homeserver_configured"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Waldur cannot reach the Matrix homeserver
+          description: >-
+            Waldur's backend has not reached the homeserver at
+            MATRIX_HOMESERVER_URL for 5 minutes, so chat is down for everyone.
+            The bot sign-in and appservice ping alerts stay quiet while it
+            fires: both checks fail with it.
+      - alert: WaldurMatrixBotNotRunning
+        expr: >-
+          waldur_matrix_check_passed:last20m{check="bot_running"} == 0
+          unless ignoring(check)
+          waldur_matrix_check_passed:last20m{check="homeserver_configured"} == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: The Matrix bot is not running
+          description: >-
+            No matrix_bot process has held the bot's lease for 10 minutes.
+            Messages Waldur posts in rooms wait in the outbox and chat commands
+            get no answer until the bot runs again.
+      - alert: WaldurMatrixBotSignInFailing
+        expr: >-
+          waldur_matrix_check_passed:last20m{check="bot_whoami"} == 0
+          unless ignoring(check)
+          waldur_matrix_check_passed:last20m{check="homeserver_reachable"} == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: The homeserver does not accept Waldur's appservice token
+          description: >-
+            The homeserver has rejected the bot's whoami call for 10 minutes:
+            the appservice is not registered, or is registered with other
+            tokens. Waldur cannot create rooms or accounts until it is fixed.
+      - alert: WaldurMatrixAppservicePingFailing
+        expr: >-
+          waldur_matrix_check_passed:last20m{check="appservice_ping"} == 0
+          unless ignoring(check)
+          waldur_matrix_check_passed:last20m{check="bot_whoami"} == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: The homeserver cannot reach Waldur's appservice endpoint
+          description: >-
+            The appservice ping has failed for 10 minutes. The homeserver
+            cannot deliver room events to Waldur, so membership and messages
+            Waldur reacts to are not processed.
+      - alert: WaldurMatrixRoomsErred
+        expr: waldur_matrix_rooms:last20m{state="error"} > 0
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: Matrix rooms are stuck in the error state
+          description: >-
+            {{ $value }} Matrix room(s) have been in the error state for
+            30 minutes. Waldur does not retry them on its own.
+```
+
+The rules match the metrics of every Waldur the Prometheus scrapes. A stack
+that never ran the `matrix` profile raises no alert among them: the endpoint
+answers there too, its diagnostics report that no homeserver URL is set, and
+the alerts stay quiet where that is so. One that ran the profile and no longer
+does still has `MATRIX_HOMESERVER_URL` set, and keeps raising the homeserver
+and bot alerts. The other side of it: if that setting is emptied on a stack
+that has chat, its four check alerts fall silent.
+`WaldurMatrixMetricsMissing` fires only when no exporter at all publishes
+Matrix metrics, so with several it does not notice one of them going away.
+
+| Alert | Fires when | Severity | First thing to check |
+| --- | --- | --- | --- |
+| `WaldurMatrixMetricsMissing` | No `waldur_matrix_diagnostics_up` series for 15 minutes | warning | `docker logs waldur-metrics-exporter`, that the image is a version with Matrix metrics, and that Prometheus lists the exporter as a target. |
+| `WaldurMatrixDiagnosticsDown` | The diagnostics call failed for 10 minutes | warning | `docker logs waldur-metrics-exporter`. `403` means the token belongs to neither a support nor a staff user, or Waldur is too old to let support users read diagnostics; anything else, `docker logs waldur-mastermind-api`. |
+| `WaldurMatrixHomeserverUnreachable` | `homeserver_reachable` failed for 5 minutes while a homeserver URL is set | critical | `docker logs tuwunel`. A `tuwunel` container that is up but not answering after a tag change is migrating its database: do not restart it, see [Pinned image tags](#pinned-image-tags). |
+| `WaldurMatrixBotNotRunning` | `bot_running` failed for 10 minutes while a homeserver URL is set | warning | `docker logs waldur-matrix-bot`, see [The Matrix bot](#the-matrix-bot). |
+| `WaldurMatrixBotSignInFailing` | `bot_whoami` failed for 10 minutes while the homeserver is reachable | warning | The appservice registration: `docker logs waldur-matrix-register`, and [Token rotation](#token-rotation) if the tokens changed. |
+| `WaldurMatrixAppservicePingFailing` | `appservice_ping` failed for 10 minutes while `bot_whoami` passes | warning | That `tuwunel` can reach the API at the registered URL (`http://waldur-mastermind-api:8080` unless `WALDUR_MATRIX_APPSERVICE_URL` changes it), and `docker logs waldur-mastermind-api` for `DisallowedHost`. |
+| `WaldurMatrixRoomsErred` | At least one room in the `error` state for 30 minutes | warning | `GET /api/matrix/rooms/?state=error` lists them with their `error_message`. Fix the cause, then retry each room as staff with `POST /api/matrix/rooms/<uuid>/retry/`. |
+
+When the homeserver is unreachable, the bot's whoami and the appservice ping
+fail with it, so their alerts stay quiet while
+`WaldurMatrixHomeserverUnreachable` fires. Waldur skips the ping when whoami
+fails, so the ping alert also stays quiet while `WaldurMatrixBotSignInFailing`
+fires.
+
+The alerts read the `:last20m` series the same rules record, which keep each
+check's and room count's last value for 20 minutes, so a brief exporter or
+Prometheus restart neither resolves a real alert nor starts its timer over.
+They are recorded per Waldur. Outside Kubernetes each scrape target is a
+Waldur, so several stacks can be targets of the one job above and keep their
+alerts apart.
+
+The thresholds follow the exporter's two-minute refresh: 5 minutes is two or
+three failed refreshes in a row and 10 minutes about five, which rides out a
+container restart. Waldur never retries an erred room on its own, so
+`WaldurMatrixRoomsErred` keeps firing until staff retry the rooms; the
+30 minutes give staff already handling an outage time to do that first.
+
 ## Apple Silicon
 
 The Matrix component images already publish `linux/arm64`. The Waldur images may need a local arm64 rebuild because of `openportal`'s native dependency:
