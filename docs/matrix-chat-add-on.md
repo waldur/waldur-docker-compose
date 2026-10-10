@@ -383,14 +383,10 @@ The figure does not cover:
 - Other traffic. One room per user, no typing notifications, media, calls or
   federation, and a database with little history. Caddy was not in the path.
 
-Waldur accepts the homeserver's appservice transactions under its
-`matrix_webhook` throttle, 10000 an hour. At about one transaction per message,
-the traffic above uses it up at around 830 concurrent users; Waldur then
-answers 429 and the homeserver retries. Messages still arrive, as the bot reads
-its own sync, but the diagnostics' appservice ping shares the throttle and
-fails while it lasts.
-
-Before going past 1000 concurrent users, measure on your own hardware.
+Before going past 1000 concurrent users, measure on your own hardware with
+the [load test](https://github.com/waldur/waldur-mastermind/tree/develop/scripts/matrix_capacity)
+the figure was measured with. It is for a test deployment: it creates users,
+projects and rooms of its own.
 
 ### Homeserver resources
 
