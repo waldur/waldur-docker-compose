@@ -378,10 +378,17 @@ The figure does not cover:
   it uploads its keys, the clients of the other members fetch them, and each
   sender's next message shares its session key with the new device, one
   to-device message per device in the room. A device signed out, by Waldur's
-  daily prune too, makes senders share a new key with every device. None of
-  this was simulated, so take the figure as an upper bound.
+  daily prune too, makes senders share a new key with every device. Each page
+  load also rehydrates the user's dehydrated device, which collects the room
+  keys sent while no drawer was open and is then replaced by a fresh one, and
+  restores the user's key backup in the background; both grow with the history
+  the user can read. The dehydrated device is one more device per user that
+  senders share keys with. None of this was simulated, so take the figure as an
+  upper bound.
 - Other traffic. One room per user, no typing notifications, media, calls or
   federation, and a database with little history. Caddy was not in the path.
+  Calls add nothing to size for here: their media is encrypted end to end in
+  the browsers and LiveKit only forwards the encrypted frames.
 
 Before going past 1000 concurrent users, measure on your own hardware with
 the [load test](https://github.com/waldur/waldur-mastermind/tree/develop/scripts/matrix_capacity)
@@ -413,6 +420,29 @@ services:
   100 MiB here. A `mem_limit` below them gets the container killed once the
   database is large enough, so plan on roughly 1 GiB plus 0.2 GiB per core of
   the host.
+
+### Bot resources
+
+The bot (`waldur-matrix-bot`) decrypts every message in every Waldur room, makes
+every history export, up to three at a time, and writes rooms' earlier keys into
+new members' key backups. The compose file sets no limits on it. An export keeps
+a few MiB of working files in memory and spills the rest, encrypted, to
+temporary files in the container's `/tmp`; with `MATRIX_EXPORT_MEDIA` on, each
+export holds up to 200 MB of media, in files of up to 50 MB. One attachment at a
+time is held in memory, and saving an export reads its files whole, so with
+media export on leave the bot a few hundred MiB of headroom, and more if you
+cap it with `mem_limit`. Exports running side by side take turns at both, so
+three exports need no more memory than one.
+
+### Database growth
+
+With `MATRIX_HISTORY_EXPORT_ENABLED` on, a task at 02:00 every night queues a
+full-history export of every active room, and with `MATRIX_EXPORT_MEDIA` on each
+one carries its media too, up to 200 MB. Exports are stored, encrypted, in
+`waldur-db` and kept for `MATRIX_HISTORY_EXPORT_RETENTION_DAYS`, 90 by default,
+along with each room's newest completed export whatever its age. Plan the disk
+behind `waldur-db` and its backups for about 90 daily copies of every active
+room's history and media; encrypted files do not compress.
 
 ### One replica
 
