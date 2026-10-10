@@ -101,7 +101,7 @@ manual. `waldur-matrix-init` still renders the descriptor into the
 `generate_appservice_registration`, so it claims the same user and room-alias
 namespaces the register container would.
 
-The default config has `WALDUR_MATRIX_OPEN_REGISTRATION=false`, so client-side registration (Element Web sign-up form) is disabled. Use Tuwunel's Synapse-compatible admin endpoint (HMAC-keyed by the registration secret) to provision the admin user. That endpoint is not served through Caddy, so the snippet below runs inside the Compose network, in a throwaway `waldur-matrix-init` container that has the secrets volume mounted. It does the whole thing — create the admin, find the admin room, post the `!admin appservices register` message with the descriptor and then `!admin users make-user-admin` for the bot, print Tuwunel's replies. Choose the admin's username, and type its password at the prompt, so it lands neither in shell history nor on a command line:
+The default config has `WALDUR_MATRIX_OPEN_REGISTRATION=false`, so signing up from a client, such as Element Web's sign-up form, needs the registration token; nobody without it can register. Use Tuwunel's Synapse-compatible admin endpoint (HMAC-keyed by the registration secret) to provision the admin user. That endpoint is not served through Caddy, so the snippet below runs inside the Compose network, in a throwaway `waldur-matrix-init` container that has the secrets volume mounted. It does the whole thing — create the admin, find the admin room, post the `!admin appservices register` message with the descriptor and then `!admin users make-user-admin` for the bot, print Tuwunel's replies. Choose the admin's username, and type its password at the prompt, so it lands neither in shell history nor on a command line:
 
 ```bash
 read -rs -p 'Matrix admin password: ' ADMIN_PASSWORD && echo && export ADMIN_PASSWORD
@@ -324,7 +324,7 @@ admin cannot read with password login off, such as a new
 
 ## Token lifetimes
 
-Waldur's chat drawer signs in with a refresh token, so its access tokens expire after `access_token_ttl` (300 seconds) and are renewed in the background; a page left silent for `refresh_token_ttl` (86400 seconds, idle), e.g. on a suspended laptop, starts a new session through Waldur. Clients that sign in without a refresh token, such as Element with a password, keep non-expiring tokens. To change the lifetimes, edit `config/matrix/tuwunel.toml.template`; `access_token_ttl` must be positive, as Tuwunel reads `0` as "expire immediately".
+Waldur's chat drawer signs in with a refresh token, so its access tokens expire after `access_token_ttl` (300 seconds) and are renewed in the background; a page left silent for `refresh_token_ttl` (86400 seconds, idle), e.g. on a suspended laptop, starts a new session through Waldur. Waldur also signs out its chat devices idle for more than 24 hours, when a user starts a session and in a daily job at 03:45 UTC, so whatever the refresh lifetime, an idle drawer's device lasts at most about two days. Clients that sign in without a refresh token, such as Element with a password, keep non-expiring tokens. To change the lifetimes, edit `config/matrix/tuwunel.toml.template`; `access_token_ttl` must be positive, as Tuwunel reads `0` as "expire immediately".
 
 Tuwunel reads its configuration only at startup, and `tuwunel.toml` is rendered from the template only when `waldur-matrix-init` runs, on `up`. After upgrading or editing the template, re-render it and restart Tuwunel, which an `up` leaves running with the old values:
 
@@ -381,8 +381,14 @@ characters, a client ID or brand with anything but letters, digits, `.`, `_`
 and `-`, an issuer that is not an `https://` URL, and an unrecognised claim.
 It also refuses single sign-on together with
 `WALDUR_MATRIX_OPEN_REGISTRATION=true`: with `trusted`, anyone could register
-`@bob` first and receive bob's SSO login. The homeserver is configured so SSO
-lands in Waldur's account:
+`@bob` first and receive bob's SSO login. Registration with the token stays
+open, though: `tuwunel.toml` keeps `allow_registration = true` with the
+registration token from `secrets.env`, which Waldur also holds in its settings,
+where staff can read it. Whoever holds the token can register `@bob` before
+Waldur provisions bob, and then receives bob's SSO login too. The Helm chart
+refuses single sign-on with any registration open; Waldur provisions users
+through its appservice when registration is closed. The homeserver is
+configured so SSO lands in Waldur's account:
 
 - `name` is `WALDUR_MATRIX_SSO_NAME`, the label of the login button.
   `brand` is `WALDUR_MATRIX_SSO_BRAND`, the kind of IdP (`keycloak`, `github`,
