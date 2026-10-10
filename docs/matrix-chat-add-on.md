@@ -203,10 +203,20 @@ sent to it. It needs the appservice registered (above): until then it
 restarts with a sign-in error. It also needs to be a homeserver admin (above)
 for the drawer's encryption reset and for locking users deactivated in Waldur.
 
+The bot also makes every history export and writes rooms' earlier keys into
+new members' key backups, so that they can read what was said before they
+joined. While it is down, exports stay `pending` and are made once it starts,
+and disabling a room with `MATRIX_HISTORY_EXPORT_ENABLED` on cannot finish: the
+room is not archived until its history is exported, so it goes to `error` at
+once when the bot is not running, or after 15 minutes when the bot does not
+finish the export in time. Disable it again once the bot runs.
+
 Run exactly one. It holds a lease in `waldur-db`, and a second one refuses to
 start while the lease is held. Its keys live in `waldur-db` too (schema
 `matrix_bot`), pickled under a key that is encrypted with Waldur's field
 encryption key, so a database backup carries them and no volume is needed.
+Exports do spool encrypted temporary files to the container's `/tmp`, up to a
+few hundred MB each with media export on.
 
 ```bash
 docker logs waldur-matrix-bot 2>&1 | grep "running on device"
@@ -217,7 +227,10 @@ bot's identity. Before starting a stack on a restored copy of another
 deployment's database (a staging copy of production, say), leave out the
 `matrix` profile or drop the copy's `matrix_bot` schema and
 `matrix_chat_matrixbotidentity` rows. Otherwise a second bot runs as the same
-device, can read the original's rooms, and corrupts both bots' sessions.
+device, can read the original's rooms, and corrupts both bots' sessions. A
+copy that keeps the same `FIELD_ENCRYPTION_KEY` also yields every user's
+escrowed recovery key and every history export, so treat it as you would
+production.
 
 ## Enabling the homeport UI
 
@@ -535,6 +548,7 @@ Until the appservice is registered, room creation fails with `M_UNKNOWN_TOKEN` i
 - **`M_UNKNOWN_TOKEN` in worker logs after a token rotation**: the homeserver still holds the registration with the old tokens. Check `docker logs waldur-matrix-register` and see [Token rotation](#token-rotation). Registering the descriptor again by hand does not fix it on its own: Tuwunel keeps the old tokens for an id it already has, so unregister first.
 - **Webhook `DisallowedHost` errors**: the appservice descriptor is rendered with `url: http://waldur-mastermind-api:8080` (the Compose service name), which is in `ALLOWED_HOSTS` for the dockerised settings. If you change the URL — for example to call back via an external hostname — patch `ALLOWED_HOSTS` in `config/waldur-mastermind/override.conf.py`.
 - **Chat drawer says encryption is unavailable in this browser**: the browser refused the encryption WebAssembly. The homeport `Content-Security-Policy` in the `Caddyfile` must keep `'wasm-unsafe-eval'` in `script-src`; it allows compiling WebAssembly only, not `eval()` of JavaScript. A Caddyfile customized before this was added needs it added by hand.
+- **Calls in encrypted rooms fail after a CSP change**: calls encrypt their media in a Web Worker that homeport serves from its own origin (`/assets/e2eeWorker-*.js`), so `script-src 'self'` in the `Caddyfile` already covers it and no `worker-src` is set. A customized policy that sets `worker-src` must include `'self'`.
 - **Browser chat drawer fails to connect**: the backend talks to Tuwunel internally at `http://tuwunel.internal:6167` (Docker DNS); the browser must reach Tuwunel through Caddy at `https://${WALDUR_DOMAIN}`. `waldur-matrix-init` seeds both — backend uses `MATRIX_HOMESERVER_URL`, browser-facing endpoints serve `MATRIX_HOMESERVER_PUBLIC_URL` (requires `waldur-mastermind` >= 8.x with the dual-URL split). If the chat drawer logs CSP errors connecting to `tuwunel.internal`, verify `MATRIX_HOMESERVER_PUBLIC_URL` is set: `docker exec waldur-mastermind-worker waldur shell -c "from constance import config; print(config.MATRIX_HOMESERVER_PUBLIC_URL)"`.
 - **A call shows "Could not connect to the call."**: confirm `--profile matrix-rtc` is active and `WALDUR_MATRIX_RTC_ENABLED=true`, then check the call token request to `https://${WALDUR_DOMAIN}/api/matrix/livekit/…` in the browser's network tab and `docker compose logs waldur-mastermind-api`. `403` means Waldur refused the caller (not joined to the room, or an unknown device). `503` means Waldur could not reach the homeserver or LiveKit, or the LiveKit settings are missing: check that `waldur-matrix-init` ran with RTC enabled. A request still going to `/lk-jwt/…` means the homeserver serves an old `.well-known`: restart `tuwunel` (see [Upgrading from lk-jwt-service](#upgrading-from-lk-jwt-service)).
 - **Diagnostics shows "Public homeserver reachable" as FAIL even though the chat works**: the reachability probe at `/api/admin/matrix/diagnostics/` runs from inside the mastermind container. The public URL (`https://${WALDUR_DOMAIN}`) is a Caddy-proxied address reachable from the browser, not from the backend's network namespace — so the probe gets `Connection refused`. The "Public homeserver URL configured" check above it confirms the value is set; verify the chat round-trips end-to-end from a browser instead of trusting this single probe.
