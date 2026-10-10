@@ -331,6 +331,101 @@ docker compose --profile matrix up -d
 docker compose restart tuwunel
 ```
 
+## Capacity
+
+Homeport keeps one `/sync` long-poll open on the homeserver for every
+signed-in user who is a member of an active room, in every open tab, whether
+or not the chat drawer is open: it connects in the background to show the
+unread badge. Size the homeserver for those users, not only for the ones
+chatting.
+
+**One homeserver supports 1000 concurrent users with 4 CPU cores.** Measured on
+a MacBook Pro (Apple M4 Pro, 12 cores, 24 GiB) under Docker Desktop
+with 12 CPUs and 7.75 GiB, with this add-on (Tuwunel v1.9.3, the shipped
+`tuwunel.toml.template`):
+
+| Concurrent users | `cpus` on `tuwunel` | p95 delivery | CPU used, cores (average / peak) | Memory |
+| --- | --- | --- | --- | --- |
+| 500 | 2 | 0.38 s | 0.6 / 2.1 | 250 MiB |
+| 1000 | 2 | 71 s, fell behind | 2.0 / 2.2 | 470 MiB |
+| 1000 | 4 | 0.41 s | 1.9 / 4.1 | 320 MiB |
+| 500 | none | 0.10 s | 0.4 / 1.1 | 270 MiB |
+| 1000 | none | 0.14 s | 1.8 / 4.3 | 310 MiB |
+| 2000 | none | 1.6 s, p99 5.7 s | 5.4 / 9.3 | 490 MiB |
+| 3000 | none | 77 s | 9.5, saturated | 1.1 GiB |
+
+Delivery runs from the start of the send request to the message arriving in
+another member's `/sync`. Users and rooms were created by Waldur: rooms of 25
+members plus the bot, so Waldur's appservice received the homeserver's
+transactions as in production. Each user synced as the drawer does (30 s
+long-polls, presence on, access tokens refreshed every 5 minutes) and sent a
+message every 5 minutes on average, busier than most project chats; one in ten
+posted a read receipt for every message, as a drawer open on the room does.
+Each step started with every user loading the page within 30 s.
+
+CPU grows faster than the number of users: from 1000 to 2000 users it tripled.
+Idle connections are cheap (1000 users sending nothing took half a core); what
+costs is fanning messages and read receipts out to the members of each room.
+At 2000 users the page loads at the start saturated nine cores and p99
+delivery passed 5 s; at 3000, messages took over a minute.
+
+The figure does not cover:
+
+- Server hardware. It was measured on a laptop, which also ran the rest of the
+  Waldur stack and the load generator.
+- End-to-end encryption. Messages were plain text of the size of an encrypted
+  one. The drawer keeps its keys in memory, so every page load is a new device:
+  it uploads its keys, the clients of the other members fetch them, and each
+  sender's next message shares its session key with the new device, one
+  to-device message per device in the room. A device signed out, by Waldur's
+  daily prune too, makes senders share a new key with every device. None of
+  this was simulated, so take the figure as an upper bound.
+- Other traffic. One room per user, no typing notifications, media, calls or
+  federation, and a database with little history. Caddy was not in the path.
+
+Waldur accepts the homeserver's appservice transactions under its
+`matrix_webhook` throttle, 10000 an hour. At about one transaction per message,
+the traffic above uses it up at around 830 concurrent users; Waldur then
+answers 429 and the homeserver retries. Messages still arrive, as the bot reads
+its own sync, but the diagnostics' appservice ping shares the throttle and
+fails while it lasts.
+
+Before going past 1000 concurrent users, measure on your own hardware.
+
+### Homeserver resources
+
+The compose file sets no limits on `tuwunel`, so it shares the host with
+Waldur. For up to 1000 concurrent users, give the host about 4 cores and 4 GiB
+of memory on top of what Waldur needs. To cap the homeserver, add an override:
+
+```yaml
+# docker-compose.override.yml
+services:
+  tuwunel:
+    cpus: 4
+    # About 1 GiB plus 0.2 GiB per CPU core of the host, see below.
+    mem_limit: 4g
+```
+
+- **CPU.** At 1000 users the homeserver used under 2 cores on average, but page
+  loads and bursts of messages took it to 4. Leave `cpus` off or set it to at
+  least 4: at 2 the same load fell behind and never caught up.
+- **Memory.** Tuwunel sizes its caches from the CPU cores of the host, not from
+  `cpus`: its defaults scale them with the core count, and on the 12-core
+  machine above they could grow to about 2.4 GiB, with `cpus: 2` as well. They
+  fill as the history grows, not with the number of users, and held under
+  100 MiB here. A `mem_limit` below them gets the container killed once the
+  database is large enough, so plan on roughly 1 GiB plus 0.2 GiB per core of
+  the host.
+
+### One replica
+
+Tuwunel is one process with an embedded RocksDB database on the `tuwunel_data`
+volume. It scales up, not out: a second instance cannot share the load.
+Scaling up has diminishing returns, since each added core buys fewer users than
+the last: at the traffic above, 2000 concurrent users was already the knee with
+12 cores.
+
 ## Single sign-on for Matrix clients
 
 With Waldur's `MATRIX_EXTERNAL_LOGIN_METHOD` set to `oidc`, users sign in to
