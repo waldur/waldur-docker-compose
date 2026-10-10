@@ -525,8 +525,8 @@ moment, and why a history export is not a backup.
 |---|---|
 | `tuwunel_data` volume | The homeserver's database, media included |
 | `waldur_matrix_secrets` volume | The appservice and registration tokens, and `BOOTSTRAP_PASSWORD`, which registration signs in with |
-| `waldur-db` | Rooms and Matrix profiles, the tokens in Constance, users' escrowed recovery keys, and the bot's keys (schema `matrix_bot`) |
-| `.env` | `GLOBAL_SECRET_KEY` and `FIELD_ENCRYPTION_KEY`, without which the recovery keys, the bot's keys and the tokens in `waldur-db` cannot be read; `WALDUR_TUWUNEL_IMAGE_TAG` |
+| `waldur-db` | Rooms and Matrix profiles, the tokens in Constance, users' escrowed recovery keys, the bot's keys (schema `matrix_bot`), and the history exports, files included: Waldur's default `DatabaseStorage` keeps them in the database, encrypted, each export's key in its row |
+| `.env` | `GLOBAL_SECRET_KEY` and `FIELD_ENCRYPTION_KEY`: the latter unlocks the recovery keys, the bot's keys, every history export and the secret Constance settings, tokens included, and none of them can be read without it. During a key rotation, `FIELD_ENCRYPTION_KEY_FALLBACKS` as well. Also `WALDUR_TUWUNEL_IMAGE_TAG`, and `WALDUR_LIVEKIT_KEY` and `WALDUR_LIVEKIT_SECRET` for calls |
 
 ### Taking a backup
 
@@ -553,7 +553,17 @@ homeserver's copy. `--volumes-from tuwunel` mounts the container's own volumes,
 whatever the Compose project is called; `docker compose run -v tuwunel_data:…`
 mounts a new, empty volume of that name instead. Move the files off the host,
 and restrict access to them as to the database: together they hold every token
-and the keys to everything encrypted in the dump.
+and the keys to everything encrypted in the dump, and, with the homeserver's
+volume, the keys to every user's key backup, and so to every encrypted message.
+
+History exports are encrypted and do not compress, so `waldur.dump` grows by
+about as much as the exports take up.
+
+LiveKit keeps no state: only `WALDUR_LIVEKIT_KEY` and `WALDUR_LIVEKIT_SECRET`
+matter, and they are in `.env`. Nothing of a call needs restoring, but calls in
+progress drop while the homeserver is stopped, and none can start until it is
+back: Waldur checks each caller at the homeserver before it issues a call
+token.
 
 ### Restoring everything
 
@@ -622,8 +632,15 @@ Where you can, restore the homeserver from the same backup set as well.
 
 `GET /api/admin/matrix/diagnostics/` (staff) passes every check except
 "Public homeserver reachable" (see [Troubleshooting](#troubleshooting)) and,
-without calls, "LiveKit configured". Then send `!help` in a room: the bot
-answers.
+without calls, "LiveKit configured"; "History exports" (`history_exports`)
+shows no failures. Then send `!help` in a room: the bot answers.
+
+Where history export is on, download the newest completed export
+(`GET /api/matrix/exports/?state=completed`, then
+`GET /api/matrix/exports/<uuid>/download/export/`). A `409` means the export
+cannot be decrypted, most likely because the restored `waldur-db` does not match
+`FIELD_ENCRYPTION_KEY` in `.env`: then the recovery keys and the bot's keys
+cannot be read either.
 
 The drill this procedure comes from ran Tuwunel 1.9.3 and a mastermind image
 built from develop on 2026-10-09: a project room with encrypted messages and a
