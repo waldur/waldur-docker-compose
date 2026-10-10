@@ -33,6 +33,8 @@ Matrix component versions live in `.env`. Bump them deliberately:
 
 Both publish multi-arch (`linux/amd64` and `linux/arm64`) manifests for the pinned tags. Re-check with `docker buildx imagetools inspect <image>:<tag>` after bumps.
 
+A tag can be moved to another image; a digest cannot. Either variable also takes `<tag>@sha256:<digest>` to pin the image itself. Two other images the add-on depends on are moving tags: `caddy:2`, which serves `/_matrix`, and `postgres:${WALDUR_POSTGRES_IMAGE_TAG}` (`16`), which holds Waldur's database, the bot's keys included.
+
 **Back up before bumping Tuwunel.** It migrates its embedded database in place
 on the first boot of a new version, before it listens (from 1.9.1 it logs its
 progress every fifteen seconds; earlier versions log nothing), so read the
@@ -50,9 +52,9 @@ has the upgrade and CVE-response procedure, which applies to both packaging
 paths.
 
 **`WALDUR_DOMAIN` is frozen once the homeserver has data.** It is the Matrix
-`server_name`, baked into every user and room ID. From 1.9.0 the homeserver
-also stamps it into the database on first boot and refuses to start under a
-different name:
+`server_name`, baked into every user and room ID. The homeserver also stamps
+it into the database on first boot and refuses to start under a different
+name:
 
 ```text
 Critical error starting server: Database belongs to old.example; configured server name is new.example. Cannot reuse.
@@ -63,7 +65,7 @@ the whole chat corpus. Changing the domain means a fresh homeserver.
 
 ## Appservice registration
 
-Tuwunel does not load appservice descriptors from a file — it requires registration via the `!admin appservices register` admin-room command. This is handled for you: the one-shot `waldur-matrix-register` container runs after the homeserver comes up, drives that admin-room command and makes the bot a homeserver admin (see below). There is nothing to paste.
+This stack registers the appservice through Tuwunel's `!admin appservices register` admin-room command; Tuwunel can also read registrations from its config file, which the stack does not use. This is handled for you: the one-shot `waldur-matrix-register` container runs after the homeserver comes up, drives that admin-room command and makes the bot a homeserver admin (see below). There is nothing to paste.
 
 On a new homeserver it first creates a bootstrap admin, `@waldur-bootstrap`, through Tuwunel's shared-secret registration API on the internal network. The generated registration token is the shared secret, and `BOOTSTRAP_PASSWORD` from the secrets volume becomes the account's password. That first run uses the token the registration returns, so it works with password login off. Later runs sign in as `@waldur-bootstrap` with that password, and every run signs the bootstrap session out when it is done.
 
