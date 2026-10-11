@@ -214,7 +214,9 @@ finish the export in time. Disable it again once the bot runs.
 Run exactly one. It holds a lease in `waldur-db`, and a second one refuses to
 start while the lease is held. Its keys live in `waldur-db` too (schema
 `matrix_bot`), pickled under a key that is encrypted with Waldur's field
-encryption key, so a database backup carries them and no volume is needed.
+encryption key, `FIELD_ENCRYPTION_KEY`, or with a key derived from
+`GLOBAL_SECRET_KEY` while that is unset (the default), so a database backup
+carries them and no volume is needed.
 Exports do spool encrypted temporary files to the container's `/tmp`, up to a
 few hundred MB each with media export on.
 
