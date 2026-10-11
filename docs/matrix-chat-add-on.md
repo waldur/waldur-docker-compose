@@ -390,10 +390,11 @@ The figure does not cover:
   Calls add nothing to size for here: their media is encrypted end to end in
   the browsers and LiveKit only forwards the encrypted frames.
 
-Before going past 1000 concurrent users, measure on your own hardware with
-the [load test](https://github.com/waldur/waldur-mastermind/tree/develop/scripts/matrix_capacity)
-the figure was measured with. It is for a test deployment: it creates users,
-projects and rooms of its own.
+Before going past 1000 concurrent users, measure on your own hardware, on a
+test deployment rather than production, with load shaped like the above:
+users and rooms created through Waldur, so that its appservice is in the path,
+each user syncing as the drawer does, and every user loading the page at the
+start.
 
 ### Homeserver resources
 
