@@ -526,7 +526,7 @@ moment, and why a history export is not a backup.
 | `tuwunel_data` volume | The homeserver's database, media included |
 | `waldur_matrix_secrets` volume | The appservice and registration tokens, and `BOOTSTRAP_PASSWORD`, which registration signs in with |
 | `waldur-db` | Rooms and Matrix profiles, the tokens in Constance, users' escrowed recovery keys, the bot's keys (schema `matrix_bot`), and the history exports, files included: Waldur's default `DatabaseStorage` keeps them in the database, encrypted, each export's key in its row |
-| `.env` | `GLOBAL_SECRET_KEY` and `FIELD_ENCRYPTION_KEY`: the latter unlocks the recovery keys, the bot's keys, every history export and the secret Constance settings, tokens included, and none of them can be read without it. During a key rotation, `FIELD_ENCRYPTION_KEY_FALLBACKS` as well. Also `WALDUR_TUWUNEL_IMAGE_TAG`, and `WALDUR_LIVEKIT_KEY` and `WALDUR_LIVEKIT_SECRET` for calls |
+| `.env` | `GLOBAL_SECRET_KEY` and `FIELD_ENCRYPTION_KEY`: the latter, or a key derived from `GLOBAL_SECRET_KEY` while it is unset (the default), unlocks the recovery keys, the bot's keys, every history export and the secret Constance settings, tokens included, and none of them can be read without it. During a key rotation, `FIELD_ENCRYPTION_KEY_FALLBACKS` as well. Also `WALDUR_TUWUNEL_IMAGE_TAG`, and `WALDUR_LIVEKIT_KEY` and `WALDUR_LIVEKIT_SECRET` for calls |
 
 ### Taking a backup
 
@@ -618,8 +618,10 @@ Waldur's database is now newer than the homeserver.
 [Restoring only the homeserver](https://docs.waldur.com/latest/developer-guide/admin-guide/matrix-appservice-setup/#restoring-only-the-homeserver)
 in Waldur's admin guide says what that breaks: the `DELETE` above resets the
 bot's read position, without which it skips events; new chat sessions may not
-reach the bot for a while; and users and rooms created after the backup are
-missing, which its repair snippet fixes. Run the snippet with
+reach the bot for a while; users and rooms created after the backup are
+missing, which its repair snippet fixes; and members' key backups roll back,
+which its last command refills. Run its `waldur shell -c "…"` commands with
+`docker exec waldur-mastermind-worker` in front, and the repair snippet with
 `docker exec -i waldur-mastermind-worker waldur shell <<'EOF'`.
 
 ### Restoring only Waldur's database
@@ -631,25 +633,16 @@ Where you can, restore the homeserver from the same backup set as well.
 ### Checking a restore
 
 `GET /api/admin/matrix/diagnostics/` (staff) passes every check except
-"Public homeserver reachable" (see [Troubleshooting](#troubleshooting)) and,
-without calls, "LiveKit configured"; "History exports" (`history_exports`)
-shows no failures. Then send `!help` in a room: the bot answers.
+"Public homeserver reachable (browser path)" (see
+[Troubleshooting](#troubleshooting)) and, without calls, "LiveKit (RTC)
+configured"; "History exports" (`history_exports`) shows no failures. Then send `!help` in a room: the bot answers.
 
 Where history export is on, download the newest completed export
 (`GET /api/matrix/exports/?state=completed`, then
 `GET /api/matrix/exports/<uuid>/download/export/`). A `409` means the export
 cannot be decrypted, most likely because the restored `waldur-db` does not match
-`FIELD_ENCRYPTION_KEY` in `.env`: then the recovery keys and the bot's keys
-cannot be read either.
-
-The drill this procedure comes from ran Tuwunel 1.9.3 and a mastermind image
-built from develop on 2026-10-09: a project room with encrypted messages and a
-bot command answered, backed up, then activity after the backup, the volume
-deleted and restored alone, and the whole host restored from a second backup
-set. Rooms, messages and the registration came back, and the bot answered
-again without the appservice being registered again. It sent messages through
-the session API with a script, not through the chat drawer or Element, and did
-not test restoring only Waldur's database or Tuwunel's online backup.
+`FIELD_ENCRYPTION_KEY` in `.env` (or `GLOBAL_SECRET_KEY`, while that is unset):
+then the recovery keys and the bot's keys cannot be read either.
 
 ## Troubleshooting
 
