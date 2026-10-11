@@ -647,7 +647,7 @@ services:
           udp_port: 443
 
   logger:
-    image: '${DOCKER_REGISTRY_PREFIX}umputun/docker-logger:v1.3.0'
+    image: '${DOCKER_REGISTRY_PREFIX}umputun/docker-logger:v1.4.1'
     container_name: "logger"
     hostname: "logger"
     restart: always
@@ -664,7 +664,8 @@ services:
         - MAX_AGE=365
         - MIX_ERR=true
         - DEBUG=false
-        - INCLUDE=waldur-db,waldur-queue,waldur-mastermind-db-migration,waldur-mastermind-worker,waldur-mastermind-beat,waldur-mastermind-api,waldur-homeport,caddy
+        - TIME_ZONE=UTC
+        - INCLUDE=waldur-db,waldur-queue,waldur-mastermind-db-migration,waldur-mastermind-whitelabeling-init,waldur-mastermind-worker,waldur-mastermind-beat,waldur-mastermind-api,waldur-mastermind-web-shell,waldur-homeport,caddy,keycloak,keycloak-db,waldur-matrix-init,waldur-matrix-register,waldur-matrix-bot,tuwunel,livekit,livekit-credentials-check
     volumes:
         - ${LOG_FOLDER}:/srv/logs
         - /var/run/docker.sock:/var/run/docker.sock

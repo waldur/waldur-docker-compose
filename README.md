@@ -48,6 +48,18 @@ docker compose down
 Logs emitted by the containers are collected and saved in the `waldur_logs` folder. You can change the location by
 editing environment variable (`.env`) and updating `LOG_FOLDER` value.
 
+The log files are owned by `root`. New log files are created with mode `0600` and new subfolders with
+mode `0750`, so reading them on the host requires `root`. Files and folders created before the upgrade
+to `docker-logger` v1.4.1 keep their old modes (`0644` and `0755`).
+
+The `logger` container resets the ownership of everything under `LOG_FOLDER` to `root` every time it
+starts. That includes automatic restarts under `restart: always`, so ownership changed on the host,
+for example for a log shipper, does not last. Give such a reader access through `root` group
+membership or ACLs instead.
+
+Each time `logger` starts, it re-reads the last 10 lines of every container it follows, so a restart
+repeats up to 10 lines per log file.
+
 ## Known issues
 
 When Waldur is launched for the first time, it applies initial database migrations.

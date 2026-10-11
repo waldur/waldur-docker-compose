@@ -69,6 +69,12 @@ Test compose configuration:
     - docker compose ps
     - docker compose exec waldur-mastermind-worker status
     - docker compose exec waldur-mastermind-worker waldur createstaffuser -u admin -p password -e admin@example.com
+    # logger must read the docker socket and write files. The group folder
+    # follows the image path ("mirror" here), so search for the file instead of
+    # spelling out its path.
+    - docker compose logs logger
+    - if docker compose logs logger | grep -i "permission denied"; then exit 1; fi
+    - docker compose exec logger sh -c 'find /srv/logs -name waldur-mastermind-worker.log -size +0 | grep .'
     # Using `docker` host due to docker networking model:
     # Accessing directly to the `dind` service
     - curl -k -i https://docker | grep 200
