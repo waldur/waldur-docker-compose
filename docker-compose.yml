@@ -161,8 +161,30 @@ services:
       tuwunel:
         condition: service_started
         required: false
+    # Ping this container's own worker (celery@<hostname>, the node name Celery
+    # derives from socket.gethostname()) and fail, with the reason, if it does not
+    # reply within 10s. Not `celery inspect ping`: that publishes through Celery's
+    # pooled producer and exits with its broker sockets still open, so RabbitMQ
+    # logs every check as "client unexpectedly closed TCP connection"; and without
+    # -d it reports healthy if any worker on the broker replies. Detaching the
+    # producer pool makes the ping publish on the check's own connection, which
+    # the `with` block closes with a proper AMQP connection.close. Same probe as
+    # waldur-helm's "waldur.workerPingProbeCommand".
     healthcheck:
-      test: ["CMD-SHELL", "celery -A waldur_core.server inspect ping"]
+      test:
+        - CMD
+        - python3
+        - -c
+        - |
+          import socket, sys
+          from waldur_core.server.celeryconf import app
+          app.control.mailbox.producer_pool = None
+          worker = "celery@" + socket.gethostname()
+          with app.connection() as conn:
+              conn.ensure_connection(max_retries=1)
+              replies = app.control.ping(destination=[worker], timeout=10, connection=conn)
+          if not replies:
+              sys.exit(worker + " did not reply to ping within 10s")
       interval: 30s
       timeout: 30s
       retries: 3
