@@ -44,7 +44,8 @@ a restart mid-migration corrupts the database.
 **Downgrades are the dangerous direction.** An older Tuwunel boots cleanly on a
 migrated database and then silently serves stale data from the old stores. Stop
 the stack and back up the `tuwunel_data` volume before changing the tag;
-restoring that backup is the only rollback. The Helm chart's
+restoring that backup is the only rollback (see
+[Backup and restore](#backup-and-restore)). The Helm chart's
 [Matrix chat guide](https://docs.waldur.com/latest/admin-guide/deployment/helm/docs/matrix-chat/)
 has the upgrade and CVE-response procedure, which applies to both packaging
 paths.
@@ -747,6 +748,136 @@ docker exec waldur-mastermind-worker waldur shell -c \
 Once `waldur-matrix-register` has registered the appservice (see Appservice registration above), visit `https://${WALDUR_DOMAIN}/projects/<uuid>/manage/?tab=chat` as a staff user and click **Create chat room**. The Manage tabs use query-param URLs (`?tab=chat`), not path segments — direct paths like `/manage/chat/` 404.
 
 Until the appservice is registered, room creation fails with `M_UNKNOWN_TOKEN` in `docker compose logs waldur-mastermind-worker`. Check `docker logs waldur-matrix-register` for why it is not.
+
+## Backup and restore
+
+Back up these four together, with the bot and the homeserver stopped.
+[Backup and restore](https://docs.waldur.com/latest/developer-guide/admin-guide/matrix-appservice-setup/#backup-and-restore)
+in Waldur's admin guide says what each holds, why they must come from the same
+moment, and why a history export is not a backup.
+
+| What | Holds |
+|---|---|
+| `tuwunel_data` volume | The homeserver's database, media included |
+| `waldur_matrix_secrets` volume | The appservice and registration tokens, and `BOOTSTRAP_PASSWORD`, which registration signs in with |
+| `waldur-db` | Rooms and Matrix profiles, the tokens in Constance, users' escrowed recovery keys, the bot's keys (schema `matrix_bot`), and the history exports, files included: Waldur's default `DatabaseStorage` keeps them in the database, encrypted, each export's key in its row |
+| `.env` | `GLOBAL_SECRET_KEY` and `FIELD_ENCRYPTION_KEY`: the latter, or a key derived from `GLOBAL_SECRET_KEY` while it is unset (the default), unlocks the recovery keys, the bot's keys, every history export and the secret Constance settings, tokens included, and none of them can be read without it. During a key rotation, `FIELD_ENCRYPTION_KEY_FALLBACKS` as well. Also `WALDUR_TUWUNEL_IMAGE_TAG`, and `WALDUR_LIVEKIT_KEY` and `WALDUR_LIVEKIT_SECRET` for calls |
+
+### Taking a backup
+
+Tuwunel 1.9 can also back its database up while it runs (`database_backup_path`
+and `!admin server backup-database`), but the add-on does not configure it, an
+admin has to run the command in the admin room, and it leaves media out. A copy
+of the stopped volume needs none of that and includes media. Chat is down while
+it is taken; Waldur is not.
+
+```bash
+mkdir -p matrix-backup
+docker compose --profile matrix stop waldur-matrix-bot tuwunel
+docker exec waldur-db pg_dump -U waldur -Fc waldur > matrix-backup/waldur.dump
+docker run --rm --volumes-from tuwunel alpine:3 \
+  tar -C /var/lib/tuwunel -czf - . > matrix-backup/tuwunel_data.tar.gz
+docker run --rm --volumes-from tuwunel alpine:3 \
+  tar -C /etc/waldur/matrix -czf - . > matrix-backup/waldur_matrix_secrets.tar.gz
+cp .env matrix-backup/
+docker compose --profile matrix up -d
+```
+
+The bot is stopped with the homeserver so that the keys in the dump match the
+homeserver's copy. `--volumes-from tuwunel` mounts the container's own volumes,
+whatever the Compose project is called; `docker compose run -v tuwunel_data:…`
+mounts a new, empty volume of that name instead. Move the files off the host,
+and restrict access to them as to the database: together they hold every token
+and the keys to everything encrypted in the dump, and, with the homeserver's
+volume, the keys to every user's key backup, and so to every encrypted message.
+
+History exports are encrypted and do not compress, so `waldur.dump` grows by
+about as much as the exports take up.
+
+LiveKit keeps no state: only `WALDUR_LIVEKIT_KEY` and `WALDUR_LIVEKIT_SECRET`
+matter, and they are in `.env`. Nothing of a call needs restoring, but calls in
+progress drop while the homeserver is stopped, and none can start until it is
+back: Waldur checks each caller at the homeserver before it issues a call
+token.
+
+### Restoring everything
+
+After losing the host or its disk, restore the whole set. Waldur and the
+homeserver then come back at the same point, and nothing needs repairing.
+Use the same `WALDUR_TUWUNEL_IMAGE_TAG` as the backup, or a newer one (see the
+downgrade warning under [Pinned image tags](#pinned-image-tags)).
+
+```bash
+cp matrix-backup/.env .env
+docker compose up -d --wait waldur-db
+docker exec -i waldur-db pg_restore -U waldur -d waldur --no-owner < matrix-backup/waldur.dump
+docker compose --profile matrix run --rm --no-deps -T --entrypoint tar waldur-matrix-init-volume \
+  -C /var/lib/waldur/matrix -xzf - < matrix-backup/waldur_matrix_secrets.tar.gz
+docker compose --profile matrix create tuwunel
+docker run --rm -i --volumes-from tuwunel alpine:3 \
+  tar -C /var/lib/tuwunel -xzf - < matrix-backup/tuwunel_data.tar.gz
+docker compose --profile matrix up -d
+docker wait waldur-matrix-register
+docker logs waldur-matrix-register
+# Expect: Appservice was already registered on the homeserver; the registration is unchanged.
+```
+
+`create` makes the homeserver's container and its empty volume without starting
+it. Do not `up` the `matrix` profile before the volume is restored: Tuwunel
+would create a new database in it, and the archive cannot be unpacked over that.
+
+### Restoring only the homeserver
+
+When only `tuwunel_data` is lost or damaged, by a failed Tuwunel upgrade for
+example, restore it alone:
+
+```bash
+docker compose --profile matrix stop waldur-matrix-bot tuwunel
+docker compose --profile matrix create tuwunel
+# What the volume holds now, in case the backup turns out to be the wrong one
+docker run --rm --volumes-from tuwunel alpine:3 \
+  tar -C /var/lib/tuwunel -czf - . > tuwunel_data-replaced.tar.gz
+docker run --rm -i --volumes-from tuwunel alpine:3 \
+  sh -c 'find /var/lib/tuwunel -mindepth 1 -delete && tar -C /var/lib/tuwunel -xzf -' \
+  < matrix-backup/tuwunel_data.tar.gz
+docker exec waldur-db psql -U waldur -d waldur -c 'DELETE FROM matrix_bot.synctokens'
+docker compose --profile matrix up -d
+```
+
+The registration comes back with the volume, so `waldur-matrix-register`
+changes nothing, unless the tokens were rotated after the backup: then it
+replaces the registration, as after a rotation (with password login off, see
+[Rotating with password login off](#rotating-with-password-login-off)).
+
+Waldur's database is now newer than the homeserver.
+[Restoring only the homeserver](https://docs.waldur.com/latest/developer-guide/admin-guide/matrix-appservice-setup/#restoring-only-the-homeserver)
+in Waldur's admin guide says what that breaks: the `DELETE` above resets the
+bot's read position, without which it skips events; new chat sessions may not
+reach the bot for a while; users and rooms created after the backup are
+missing, which its repair snippet fixes; and members' key backups roll back,
+which its last command refills. Run its `waldur shell -c "…"` commands with
+`docker exec waldur-mastermind-worker` in front, and the repair snippet with
+`docker exec -i waldur-mastermind-worker waldur shell <<'EOF'`.
+
+### Restoring only Waldur's database
+
+Restored alone to an older dump, `waldur-db` is older than the homeserver; see
+[Restoring only Waldur's database](https://docs.waldur.com/latest/developer-guide/admin-guide/matrix-appservice-setup/#restoring-only-waldurs-database).
+Where you can, restore the homeserver from the same backup set as well.
+
+### Checking a restore
+
+`GET /api/admin/matrix/diagnostics/` (staff) passes every check except
+"Public homeserver reachable (browser path)" (see
+[Troubleshooting](#troubleshooting)) and, without calls, "LiveKit (RTC)
+configured"; "History exports" (`history_exports`) shows no failures. Then send `!help` in a room: the bot answers.
+
+Where history export is on, download the newest completed export
+(`GET /api/matrix/exports/?state=completed`, then
+`GET /api/matrix/exports/<uuid>/download/export/`). A `409` means the export
+cannot be decrypted, most likely because the restored `waldur-db` does not match
+`FIELD_ENCRYPTION_KEY` in `.env` (or `GLOBAL_SECRET_KEY`, while that is unset):
+then the recovery keys and the bot's keys cannot be read either.
 
 ## Troubleshooting
 
