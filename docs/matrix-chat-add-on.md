@@ -33,6 +33,8 @@ Matrix component versions live in `.env`. Bump them deliberately:
 
 Both publish multi-arch (`linux/amd64` and `linux/arm64`) manifests for the pinned tags. Re-check with `docker buildx imagetools inspect <image>:<tag>` after bumps.
 
+A tag can be moved to another image; a digest cannot. Either variable also takes `<tag>@sha256:<digest>` to pin the image itself. Two other images the add-on depends on are moving tags: `caddy:2`, which serves `/_matrix`, and `postgres:${WALDUR_POSTGRES_IMAGE_TAG}` (`16`), which holds Waldur's database, the bot's keys included.
+
 **Back up before bumping Tuwunel.** It migrates its embedded database in place
 on the first boot of a new version, before it listens (from 1.9.1 it logs its
 progress every fifteen seconds; earlier versions log nothing), so read the
@@ -51,9 +53,9 @@ has the upgrade and CVE-response procedure, which applies to both packaging
 paths.
 
 **`WALDUR_DOMAIN` is frozen once the homeserver has data.** It is the Matrix
-`server_name`, baked into every user and room ID. From 1.9.0 the homeserver
-also stamps it into the database on first boot and refuses to start under a
-different name:
+`server_name`, baked into every user and room ID. The homeserver also stamps
+it into the database on first boot and refuses to start under a different
+name:
 
 ```text
 Critical error starting server: Database belongs to old.example; configured server name is new.example. Cannot reuse.
@@ -64,7 +66,7 @@ the whole chat corpus. Changing the domain means a fresh homeserver.
 
 ## Appservice registration
 
-Tuwunel does not load appservice descriptors from a file — it requires registration via the `!admin appservices register` admin-room command. This is handled for you: the one-shot `waldur-matrix-register` container runs after the homeserver comes up, drives that admin-room command and makes the bot a homeserver admin (see below). There is nothing to paste.
+This stack registers the appservice through Tuwunel's `!admin appservices register` admin-room command; Tuwunel can also read registrations from its config file, which the stack does not use. This is handled for you: the one-shot `waldur-matrix-register` container runs after the homeserver comes up, drives that admin-room command and makes the bot a homeserver admin (see below). There is nothing to paste.
 
 On a new homeserver it first creates a bootstrap admin, `@waldur-bootstrap`, through Tuwunel's shared-secret registration API on the internal network. The generated registration token is the shared secret, and `BOOTSTRAP_PASSWORD` from the secrets volume becomes the account's password. That first run uses the token the registration returns, so it works with password login off. Later runs sign in as `@waldur-bootstrap` with that password, and every run signs the bootstrap session out when it is done.
 
@@ -100,7 +102,7 @@ manual. `waldur-matrix-init` still renders the descriptor into the
 `generate_appservice_registration`, so it claims the same user and room-alias
 namespaces the register container would.
 
-The default config has `WALDUR_MATRIX_OPEN_REGISTRATION=false`, so client-side registration (Element Web sign-up form) is disabled. Use Tuwunel's Synapse-compatible admin endpoint (HMAC-keyed by the registration secret) to provision the admin user. That endpoint is not served through Caddy, so the snippet below runs inside the Compose network, in a throwaway `waldur-matrix-init` container that has the secrets volume mounted. It does the whole thing — create the admin, find the admin room, post the `!admin appservices register` message with the descriptor and then `!admin users make-user-admin` for the bot, print Tuwunel's replies. Choose the admin's username, and type its password at the prompt, so it lands neither in shell history nor on a command line:
+The default config has `WALDUR_MATRIX_OPEN_REGISTRATION=false`, so signing up from a client, such as Element Web's sign-up form, needs the registration token: no client can sign up without it. The appservice token can still register accounts, as Tuwunel exempts appservice requests from the token check. Use Tuwunel's Synapse-compatible admin endpoint (HMAC-keyed by the registration secret) to provision the admin user. That endpoint is not served through Caddy, so the snippet below runs inside the Compose network, in a throwaway `waldur-matrix-init` container that has the secrets volume mounted. It does the whole thing — create the admin, find the admin room, post the `!admin appservices register` message with the descriptor and then `!admin users make-user-admin` for the bot, print Tuwunel's replies. Choose the admin's username, and type its password at the prompt, so it lands neither in shell history nor on a command line:
 
 ```bash
 read -rs -p 'Matrix admin password: ' ADMIN_PASSWORD && echo && export ADMIN_PASSWORD
@@ -178,7 +180,9 @@ The bot then becomes `@waldur-bot:<your-domain>` (`WALDUR_MATRIX_BOT_LOCALPART`)
 
 The register container, or the snippet's second command, makes the bot a homeserver admin. Waldur calls the homeserver's admin API as the bot: resetting a user's chat encryption from the drawer goes through `/_synapse/admin/v1/reset_password`, and a user deactivated in Waldur is locked on the homeserver the same way. Without admin rights the homeserver refuses those calls. Nothing makes the bot an admin by accident: Tuwunel runs with `grant_admin_to_first_user = false`, and the admin API is reachable only on the internal network. On a deployment registered before this step existed, the next `up` makes the bot an admin.
 
-**From then on, whoever holds the appservice token is a homeserver admin.** The appservice token (`AS_TOKEN`) acts as the bot, so with it anyone can call the admin API, for example to reset any account's password and take it over. On Tuwunel, being a homeserver admin means being a member of `#admins:<your-domain>`, so `make-user-admin` joins the bot to that room. The bot itself answers commands only in Waldur's own rooms: admin-room traffic reaches its sync but triggers nothing. Anyone holding the appservice token, however, can post `!admin` commands there as the bot. The token is stored in three places: `secrets.env` and the rendered `waldur-registration.yaml` in the `waldur_matrix_secrets` volume, and Waldur's Constance settings in `waldur-db`, which database backups carry too. Restrict access to the volume, the database and its backups accordingly, and if the token may have been exposed, rotate it as described under [Token rotation](#token-rotation).
+**Treat the appservice token as a homeserver admin credential.** Waldur's registration claims every local user ID, so the appservice token (`AS_TOKEN`) can act as any account on the homeserver, `@waldur-bootstrap` and the other admins included, from the moment the appservice is registered. Once the bot is an admin, the token can also call the admin API as the bot, for example to reset any account's password and take it over. On Tuwunel, being a homeserver admin means being a member of `#admins:<your-domain>`, so `make-user-admin` joins the bot to that room. The bot itself answers commands only in Waldur's own rooms: admin-room traffic reaches its sync but triggers nothing. Anyone holding the appservice token, however, can post `!admin` commands there as the bot.
+
+The token is stored in four places: `secrets.env` and the rendered `waldur-registration.yaml` in the `waldur_matrix_secrets` volume; Waldur's Constance settings in `waldur-db`, which Waldur staff can read through the settings API; and the homeserver's `tuwunel_data`, which holds the registration and the admin room's history, where each registration is posted as a plain message, `HS_TOKEN` included. Backups of both volumes and of the database carry it. Tuwunel 1.9.3 also writes the `HS_TOKEN` into its log, `docker logs tuwunel`, whenever a call to Waldur fails to go through, because the token travels in the URL of each call and the warning quotes it. Restrict access to the volumes, the database, the homeserver's log and their backups accordingly, and if a token may have been exposed, rotate it as described under [Token rotation](#token-rotation).
 
 Admins are created through the shared-secret API, with `"admin": true`, as the register container and the snippet do. Tuwunel runs with `grant_admin_to_first_user = false`, so no account becomes an admin just by being the first one. Otherwise Waldur, which registers an account for whoever opens the chat first, could hand a user the homeserver's admin room. Once created, the admin can sign in to Element Web with that username and password.
 
@@ -186,20 +190,36 @@ On an existing deployment, `grant_admin_to_first_user = false` demotes nobody: w
 
 `/_synapse/admin/*` is not served through Caddy, which answers it with `404`; Waldur reaches the admin API on the internal network (`MATRIX_HOMESERVER_URL`).
 
+On that network Waldur and the homeserver call each other over plain HTTP (`http://tuwunel.internal:6167`, `http://waldur-mastermind-api:8080`), and Waldur calls LiveKit's room API the same way (`http://livekit.internal:7880`). These calls carry the appservice tokens, the passwords and tokens Waldur sets or mints for users, and LiveKit room-admin tokens. Every container on the Compose network can reach those addresses.
+
 ## The Matrix bot
 
 The `matrix` profile also starts `waldur-matrix-bot`, Waldur's member of every
 Waldur room. It runs on a Matrix device of its own and holds that device's
-keys, so it is the only process that can post into an encrypted room or read
-the commands sent to it there. While it runs, every message Waldur sends as the
-bot goes through it. It needs the appservice registered (above): until then it
+keys. Every Waldur room is encrypted, so it is the only process that can post
+into them: every message Waldur sends as the bot waits in `waldur-db` until the
+bot posts it. Clients share their room keys with its device as with any
+member's, so it decrypts every message in those rooms, not only the commands
+sent to it. It needs the appservice registered (above): until then it
 restarts with a sign-in error. It also needs to be a homeserver admin (above)
 for the drawer's encryption reset and for locking users deactivated in Waldur.
+
+The bot also makes every history export and writes rooms' earlier keys into
+new members' key backups, so that they can read what was said before they
+joined. While it is down, exports stay `pending` and are made once it starts,
+and disabling a room with `MATRIX_HISTORY_EXPORT_ENABLED` on cannot finish: the
+room is not archived until its history is exported, so it goes to `error` at
+once when the bot is not running, or after 15 minutes when the bot does not
+finish the export in time. Disable it again once the bot runs.
 
 Run exactly one. It holds a lease in `waldur-db`, and a second one refuses to
 start while the lease is held. Its keys live in `waldur-db` too (schema
 `matrix_bot`), pickled under a key that is encrypted with Waldur's field
-encryption key, so a database backup carries them and no volume is needed.
+encryption key, `FIELD_ENCRYPTION_KEY`, or with a key derived from
+`GLOBAL_SECRET_KEY` while that is unset (the default), so a database backup
+carries them and no volume is needed.
+Exports do spool encrypted temporary files to the container's `/tmp`, up to a
+few hundred MB each with media export on.
 
 ```bash
 docker logs waldur-matrix-bot 2>&1 | grep "running on device"
@@ -210,7 +230,10 @@ bot's identity. Before starting a stack on a restored copy of another
 deployment's database (a staging copy of production, say), leave out the
 `matrix` profile or drop the copy's `matrix_bot` schema and
 `matrix_chat_matrixbotidentity` rows. Otherwise a second bot runs as the same
-device, can read the original's rooms, and corrupts both bots' sessions.
+device, can read the original's rooms, and corrupts both bots' sessions. A
+copy that keeps the same `FIELD_ENCRYPTION_KEY` also yields every user's
+escrowed recovery key and every history export, so treat it as you would
+production.
 
 ## Enabling the homeport UI
 
@@ -323,7 +346,7 @@ admin cannot read with password login off, such as a new
 
 ## Token lifetimes
 
-Waldur's chat drawer signs in with a refresh token, so its access tokens expire after `access_token_ttl` (300 seconds) and are renewed in the background; a page left silent for `refresh_token_ttl` (86400 seconds, idle), e.g. on a suspended laptop, starts a new session through Waldur. Clients that sign in without a refresh token, such as Element with a password, keep non-expiring tokens. To change the lifetimes, edit `config/matrix/tuwunel.toml.template`; `access_token_ttl` must be positive, as Tuwunel reads `0` as "expire immediately".
+Waldur's chat drawer signs in with a refresh token, so its access tokens expire after `access_token_ttl` (300 seconds) and are renewed in the background; a page left silent for `refresh_token_ttl` (86400 seconds, idle), e.g. on a suspended laptop, starts a new session through Waldur. Waldur also signs out its chat devices idle for more than 24 hours, when a user starts a session and in a daily job at 03:45 UTC, so whatever the refresh lifetime, an idle drawer's device lasts at most about two days while the daily job runs; it skips a run when the homeserver does not answer. Clients that sign in without a refresh token, such as Element with a password, keep non-expiring tokens. To change the lifetimes, edit `config/matrix/tuwunel.toml.template`; `access_token_ttl` must be positive, as Tuwunel reads `0` as "expire immediately".
 
 Tuwunel reads its configuration only at startup, and `tuwunel.toml` is rendered from the template only when `waldur-matrix-init` runs, on `up`. After upgrading or editing the template, re-render it and restart Tuwunel, which an `up` leaves running with the old values:
 
@@ -380,8 +403,14 @@ characters, a client ID or brand with anything but letters, digits, `.`, `_`
 and `-`, an issuer that is not an `https://` URL, and an unrecognised claim.
 It also refuses single sign-on together with
 `WALDUR_MATRIX_OPEN_REGISTRATION=true`: with `trusted`, anyone could register
-`@bob` first and receive bob's SSO login. The homeserver is configured so SSO
-lands in Waldur's account:
+`@bob` first and receive bob's SSO login. Registration with the token stays
+open, though: `tuwunel.toml` keeps `allow_registration = true` with the
+registration token from `secrets.env`, which Waldur also holds in its settings,
+where staff can read it. Whoever holds the token can register `@bob` before
+Waldur provisions bob, and then receives bob's SSO login too. The Helm chart
+refuses single sign-on with any registration open; Waldur provisions users
+through its appservice when registration is closed. The homeserver is
+configured so SSO lands in Waldur's account:
 
 - `name` is `WALDUR_MATRIX_SSO_NAME`, the label of the login button.
   `brand` is `WALDUR_MATRIX_SSO_BRAND`, the kind of IdP (`keycloak`, `github`,
@@ -465,6 +494,8 @@ Earlier versions of this stack ran `lk-jwt-service` behind `/lk-jwt/` to issue c
 `WALDUR_LIVEKIT_NODE_IP` advertises the host's RTC media address to clients. The default `127.0.0.1` is correct for a local demo only — for any reachable deployment, set this to the host's external IP or DNS name so remote clients can connect. The RTC media ports (`WALDUR_MATRIX_RTC_TCP_PORT`/`UDP_PORT`, default 7881/7882) must also be reachable from clients.
 
 `WALDUR_LIVEKIT_KEY` / `WALDUR_LIVEKIT_SECRET` default to development values. Anyone who knows them can mint a token for any call, so **override both** for anything beyond a local demo, with a secret of at least 32 characters. With `--profile matrix-rtc` and a `WALDUR_DOMAIN` other than `localhost` or `host.docker.internal`, the one-shot `livekit-credentials-check` refuses the development values or a shorter secret, and `docker compose up -d` fails with `service "livekit-credentials-check" didn't complete successfully`. `livekit`, which waits for the check, does not start. The failed command can also leave other services unstarted: on a first start, or after `docker compose down`, the API, the workers, HomePort, Caddy and the homeserver stay down, so Waldur itself is down, not only calls, while the database migration may still have run. Services that were running and that this `up` does not change keep running. Set `WALDUR_LIVEKIT_KEY` and `WALDUR_LIVEKIT_SECRET` in `.env`, or turn calls off again (`WALDUR_MATRIX_RTC_ENABLED=false` and no `--profile matrix-rtc`), and run `up -d` again.
+
+The LiveKit secret, and the single sign-on client secret, reach containers as environment variables: both `waldur-matrix-init`'s, the LiveKit secret also `livekit-credentials-check`'s and `livekit`'s `LIVEKIT_CONFIG`. `docker inspect` on those containers shows them.
 
 ### TURN relay (symmetric NAT / iCloud Private Relay)
 
@@ -885,6 +916,7 @@ then the recovery keys and the bot's keys cannot be read either.
 - **`M_UNKNOWN_TOKEN` in worker logs after a token rotation**: the homeserver still holds the registration with the old tokens. Check `docker logs waldur-matrix-register` and see [Token rotation](#token-rotation). Registering the descriptor again by hand does not fix it on its own: Tuwunel keeps the old tokens for an id it already has, so unregister first.
 - **Webhook `DisallowedHost` errors**: the appservice descriptor is rendered with `url: http://waldur-mastermind-api:8080` (the Compose service name), which is in `ALLOWED_HOSTS` for the dockerised settings. If you change the URL — for example to call back via an external hostname — patch `ALLOWED_HOSTS` in `config/waldur-mastermind/override.conf.py`.
 - **Chat drawer says encryption is unavailable in this browser**: the browser refused the encryption WebAssembly. The homeport `Content-Security-Policy` in the `Caddyfile` must keep `'wasm-unsafe-eval'` in `script-src`; it allows compiling WebAssembly only, not `eval()` of JavaScript. A Caddyfile customized before this was added needs it added by hand.
+- **Calls in encrypted rooms fail after a CSP change**: calls encrypt their media in a Web Worker that homeport serves from its own origin (`/assets/e2eeWorker-*.js`), so `script-src 'self'` in the `Caddyfile` already covers it and no `worker-src` is set. A customized policy that sets `worker-src` must include `'self'`.
 - **Browser chat drawer fails to connect**: the backend talks to Tuwunel internally at `http://tuwunel.internal:6167` (Docker DNS); the browser must reach Tuwunel through Caddy at `https://${WALDUR_DOMAIN}`. `waldur-matrix-init` seeds both — backend uses `MATRIX_HOMESERVER_URL`, browser-facing endpoints serve `MATRIX_HOMESERVER_PUBLIC_URL` (requires `waldur-mastermind` >= 8.x with the dual-URL split). If the chat drawer logs CSP errors connecting to `tuwunel.internal`, verify `MATRIX_HOMESERVER_PUBLIC_URL` is set: `docker exec waldur-mastermind-worker waldur shell -c "from constance import config; print(config.MATRIX_HOMESERVER_PUBLIC_URL)"`.
 - **A call shows "Could not connect to the call."**: confirm `--profile matrix-rtc` is active and `WALDUR_MATRIX_RTC_ENABLED=true`, then check the call token request to `https://${WALDUR_DOMAIN}/api/matrix/livekit/…` in the browser's network tab and `docker compose logs waldur-mastermind-api`. `403` means Waldur refused the caller (not joined to the room, or an unknown device). `503` means Waldur could not reach the homeserver or LiveKit, or the LiveKit settings are missing: check that `waldur-matrix-init` ran with RTC enabled. A request still going to `/lk-jwt/…` means the homeserver serves an old `.well-known`: restart `tuwunel` (see [Upgrading from lk-jwt-service](#upgrading-from-lk-jwt-service)).
 - **Diagnostics shows "Public homeserver reachable" as FAIL even though the chat works**: the reachability probe at `/api/admin/matrix/diagnostics/` runs from inside the mastermind container. The public URL (`https://${WALDUR_DOMAIN}`) is a Caddy-proxied address reachable from the browser, not from the backend's network namespace — so the probe gets `Connection refused`. The "Public homeserver URL configured" check above it confirms the value is set; verify the chat round-trips end-to-end from a browser instead of trusting this single probe.
