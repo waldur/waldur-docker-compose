@@ -355,6 +355,128 @@ docker compose --profile matrix up -d
 docker compose restart tuwunel
 ```
 
+## Capacity
+
+Homeport keeps one `/sync` long-poll open on the homeserver for every
+signed-in user who is a member of an active room, in every open tab, whether
+or not the chat drawer is open: it connects in the background to show the
+unread badge. Size the homeserver for those users, not only for the ones
+chatting.
+
+**One homeserver supports 1000 concurrent users with 4 CPU cores.** Measured on
+a MacBook Pro (Apple M4 Pro, 12 cores, 24 GiB) under Docker Desktop
+with 12 CPUs and 7.75 GiB, with this add-on (Tuwunel v1.9.3, the shipped
+`tuwunel.toml.template`):
+
+| Concurrent users | `cpus` on `tuwunel` | p95 delivery | CPU used, cores (average / peak) | Memory |
+| --- | --- | --- | --- | --- |
+| 500 | 2 | 0.38 s | 0.6 / 2.1 | 250 MiB |
+| 1000 | 2 | 71 s, fell behind | 2.0 / 2.2 | 470 MiB |
+| 1000 | 4 | 0.41 s | 1.9 / 4.1 | 320 MiB |
+| 500 | none | 0.10 s | 0.4 / 1.1 | 270 MiB |
+| 1000 | none | 0.14 s | 1.8 / 4.3 | 310 MiB |
+| 2000 | none | 1.6 s, p99 5.7 s | 5.4 / 9.3 | 490 MiB |
+| 3000 | none | 77 s | 9.5, saturated | 1.1 GiB |
+
+Delivery runs from the start of the send request to the message arriving in
+another member's `/sync`. Users and rooms were created by Waldur: rooms of 25
+members plus the bot, so Waldur's appservice received the homeserver's
+transactions as in production. Each user synced as the drawer does (30 s
+long-polls, presence on, access tokens refreshed every 5 minutes) and sent a
+message every 5 minutes on average, busier than most project chats; one in ten
+posted a read receipt for every message, as a drawer open on the room does.
+Each step started with every user loading the page within 30 s.
+
+CPU grows faster than the number of users: from 1000 to 2000 users it tripled.
+Idle connections are cheap (1000 users sending nothing took half a core); what
+costs is fanning messages and read receipts out to the members of each room.
+At 2000 users the page loads at the start saturated nine cores and p99
+delivery passed 5 s; at 3000, messages took over a minute.
+
+The figure does not cover:
+
+- Server hardware. It was measured on a laptop, which also ran the rest of the
+  Waldur stack and the load generator.
+- End-to-end encryption. Messages were plain text of the size of an encrypted
+  one. The drawer keeps its keys in memory, so every page load is a new device:
+  it uploads its keys, the clients of the other members fetch them, and each
+  sender's next message shares its session key with the new device, one
+  to-device message per device in the room. A device signed out, by Waldur's
+  daily prune too, makes senders share a new key with every device. Each page
+  load also rehydrates the user's dehydrated device, which collects the room
+  keys sent while no drawer was open and is then replaced by a fresh one, and
+  restores the user's key backup in the background; both grow with the history
+  the user can read. The dehydrated device is one more device per user that
+  senders share keys with. None of this was simulated, so take the figure as an
+  upper bound.
+- Other traffic. One room per user, no typing notifications, media, calls or
+  federation, and a database with little history. Caddy was not in the path.
+  Calls add nothing to size for here: their media is encrypted end to end in
+  the browsers and LiveKit only forwards the encrypted frames.
+
+Before going past 1000 concurrent users, measure on your own hardware, on a
+test deployment rather than production, with load shaped like the above:
+users and rooms created through Waldur, so that its appservice is in the path,
+each user syncing as the drawer does, and every user loading the page at the
+start.
+
+### Homeserver resources
+
+The compose file sets no limits on `tuwunel`, so it shares the host with
+Waldur. For up to 1000 concurrent users, give the host about 4 cores and 4 GiB
+of memory on top of what Waldur needs. To cap the homeserver, add an override:
+
+```yaml
+# docker-compose.override.yml
+services:
+  tuwunel:
+    cpus: 4
+    # About 1 GiB plus 0.2 GiB per CPU core of the host, see below.
+    mem_limit: 4g
+```
+
+- **CPU.** At 1000 users the homeserver used under 2 cores on average, but page
+  loads and bursts of messages took it to 4. Leave `cpus` off or set it to at
+  least 4: at 2 the same load fell behind and never caught up.
+- **Memory.** Tuwunel sizes its caches from the CPU cores of the host, not from
+  `cpus`: its defaults scale them with the core count, and on the 12-core
+  machine above they could grow to about 2.4 GiB, with `cpus: 2` as well. They
+  fill as the history grows, not with the number of users, and held under
+  100 MiB here. A `mem_limit` below them gets the container killed once the
+  database is large enough, so plan on roughly 1 GiB plus 0.2 GiB per core of
+  the host.
+
+### Bot resources
+
+The bot (`waldur-matrix-bot`) decrypts every message in every Waldur room, makes
+every history export, up to three at a time, and writes rooms' earlier keys into
+new members' key backups. The compose file sets no limits on it. An export keeps
+a few MiB of working files in memory and spills the rest, encrypted, to
+temporary files in the container's `/tmp`; with `MATRIX_EXPORT_MEDIA` on, each
+export holds up to 200 MB of media, in files of up to 50 MB. One attachment at a
+time is held in memory, and saving an export reads its files whole, so with
+media export on leave the bot a few hundred MiB of headroom, and more if you
+cap it with `mem_limit`. Exports running side by side take turns at both, so
+three exports need no more memory than one.
+
+### Database growth
+
+With `MATRIX_HISTORY_EXPORT_ENABLED` on, a task at 02:00 every night queues a
+full-history export of every active room, and with `MATRIX_EXPORT_MEDIA` on each
+one carries its media too, up to 200 MB. Exports are stored, encrypted, in
+`waldur-db` and kept for `MATRIX_HISTORY_EXPORT_RETENTION_DAYS`, 90 by default,
+along with each room's newest completed export whatever its age. Plan the disk
+behind `waldur-db` and its backups for about 90 daily copies of every active
+room's history and media; encrypted files do not compress.
+
+### One replica
+
+Tuwunel is one process with an embedded RocksDB database on the `tuwunel_data`
+volume. It scales up, not out: a second instance cannot share the load.
+Scaling up has diminishing returns, since each added core buys fewer users than
+the last: at the traffic above, 2000 concurrent users was already the knee with
+12 cores.
+
 ## Single sign-on for Matrix clients
 
 With Waldur's `MATRIX_EXTERNAL_LOGIN_METHOD` set to `oidc`, users sign in to
