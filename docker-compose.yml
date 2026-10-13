@@ -617,6 +617,9 @@ services:
         aliases:
           - livekit.internal
     ports:
+      # LiveKit advertises its own tcp_port/udp_port (below) at node_ip and
+      # knows nothing of this mapping, so the host ports must stay 7881/7882
+      # unless something in front of the host forwards those to them.
       - '${WALDUR_MATRIX_RTC_TCP_PORT:-7881}:7881/tcp'
       - '${WALDUR_MATRIX_RTC_UDP_PORT:-7882}:7882/udp'
       # TURN/UDP relay. LiveKit advertises the relay to clients on udp_port, so

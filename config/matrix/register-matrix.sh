@@ -118,13 +118,15 @@ MATRIX_BOOTSTRAP_PASSWORD="$(sed -n 's/^BOOTSTRAP_PASSWORD=//p' "${SECRETS}")"
 
 # Without the bootstrap password the command could only warn and leave the
 # registration as it is, and a later rotation would fail far from the cause.
-# A secrets.env from before automatic registration has no such line.
+# init-matrix.sh writes the line with the tokens, so only a hand edit of
+# secrets.env loses it.
 if [[ -z "${MATRIX_BOOTSTRAP_PASSWORD}" && -z "${ADMIN_TOKEN}" ]]; then
 	cat >&2 <<-EOF
-		matrix-register: ${SECRETS} has no BOOTSTRAP_PASSWORD, so the appservice cannot be registered or updated.
-		matrix-register: If the homeserver has no @waldur-bootstrap account yet, add a password and run up again:
+		matrix-register: ${SECRETS} has no BOOTSTRAP_PASSWORD, so the appservice cannot be registered or updated. init-matrix.sh writes it with the tokens, so the line was lost in an edit of the file.
+		matrix-register: Restore the line from a backup of the waldur_matrix_secrets volume and run up again.
+		matrix-register: If the homeserver has no @waldur-bootstrap account yet, add a new password instead:
 		matrix-register:   docker compose --profile matrix run --rm --no-deps --entrypoint sh waldur-matrix-init-volume -c 'echo "BOOTSTRAP_PASSWORD=\$(openssl rand -hex 32)" >> ${SECRETS}'
-		matrix-register: Otherwise pass a homeserver admin's token, see "Rotating with password login off" in docs/matrix-chat-add-on.md.
+		matrix-register: Otherwise set a new password on @waldur-bootstrap and write it into the file, see "Rotating the registration token" in docs/matrix-chat-add-on.md.
 	EOF
 	exit 1
 fi

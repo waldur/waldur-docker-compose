@@ -84,6 +84,11 @@ docker compose down
 docker compose up -d
 ```
 
+With the Matrix chat add-on, set `COMPOSE_PROFILES` in `.env` as described in
+`docs/matrix-chat-add-on.md`, or pass the same `--profile` flags to each of
+these commands. Without the profiles, `pull` and `up -d` neither update nor
+restart the Matrix services.
+
 ### Config folder changes
 
 Every file under `${CONFIG_FOLDER}/waldur-mastermind` listed in
@@ -363,6 +368,11 @@ Example:
 ```bash
 TLS=cert.pem key.pem
 ```
+
+Caddy sends `Strict-Transport-Security: max-age=31536000` with HomePort's pages,
+so after one visit over a trusted certificate, browsers refuse plain HTTP to
+`WALDUR_DOMAIN` for a year. They ignore the header when the certificate is not
+trusted, as with `TLS=internal` without its CA installed.
 
 ## Custom Caddy configuration files
 
