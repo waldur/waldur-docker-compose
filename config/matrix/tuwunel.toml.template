@@ -74,7 +74,7 @@ dns_cache_entries = 0
 login_with_password = @@LOGIN_WITH_PASSWORD@@
 
 # Single sign-on only: the bot's localpart, waldur-bootstrap (reserved for the
-# bootstrap admin that automatic registration will create) and
+# bootstrap admin that automatic registration creates) and
 # WALDUR_MATRIX_SSO_FORBIDDEN_USERNAMES, which no identity provider account may
 # sign in to or register. Empty without single sign-on.
 @@FORBIDDEN_USERNAMES@@

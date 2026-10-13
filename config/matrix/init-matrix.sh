@@ -137,7 +137,7 @@ if [[ "${SSO_ENABLED}" == "true" ]]; then
 	fi
 	# A trusted provider signs in to any existing account its claim names, so
 	# the bot's account, waldur-bootstrap (reserved for the bootstrap admin that
-	# automatic registration will create) and any other admin are kept out of
+	# automatic registration creates) and any other admin are kept out of
 	# its reach.
 	FORBIDDEN_EXTRA="${WALDUR_MATRIX_SSO_FORBIDDEN_USERNAMES:-}"
 	if [[ ! "${LOCALPART}" =~ ^[a-z0-9._=/+-]+$ ]]; then
