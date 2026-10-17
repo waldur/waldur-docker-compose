@@ -1,4 +1,4 @@
-# Matrix chat add-on
+# Matrix chat with Docker Compose
 
 Waldur ships an optional Matrix chat integration (the `matrix_chat` Django app and the homeport `src/matrix/` views). When the add-on is enabled, project members can chat in per-project Matrix rooms; with the `matrix-rtc` sub-profile they can also start voice/video calls from the chat.
 
