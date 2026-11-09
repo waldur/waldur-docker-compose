@@ -38,6 +38,10 @@ x-mastermind-environment:
   - CELERYD_CONCURRENCY=${CELERYD_CONCURRENCY:-10}
   # Daily anonymous usage report to telemetry.waldur.com. See .env.example.
   - WALDUR_TELEMETRY_ENABLED=${WALDUR_TELEMETRY_ENABLED:-true}
+  # Seconds per connect/read/write operation of calls to the service and
+  # course account APIs and the invitation webhook. Empty keeps the image
+  # default. See .env.example.
+  - WALDUR_PROVISIONING_API_REQUEST_TIMEOUT=${WALDUR_PROVISIONING_API_REQUEST_TIMEOUT:-}
 
 x-mastermind-volumes:
   &default-mastermind-volumes
