@@ -41,7 +41,7 @@ x-mastermind-environment:
   # Seconds per connect/read/write operation of calls to the service and
   # course account APIs and the invitation webhook. Empty keeps the image
   # default. See .env.example.
-  - WALDUR_PROVISIONING_API_REQUEST_TIMEOUT=${WALDUR_PROVISIONING_API_REQUEST_TIMEOUT:-}
+  - WALDUR_USER_MANAGEMENT_API_TIMEOUT=${WALDUR_USER_MANAGEMENT_API_TIMEOUT:-}
 
 x-mastermind-volumes:
   &default-mastermind-volumes
