@@ -33,6 +33,11 @@ x-mastermind-environment:
   # Demo presets (demo deployments only): loading one wipes the database.
   - WALDUR_DEMO_PRESETS_ENABLED=${WALDUR_DEMO_PRESETS_ENABLED:-false}
   - WALDUR_DEMO_PRESETS_ALLOWED=${WALDUR_DEMO_PRESETS_ALLOWED:-}
+  # The deployment's own presets: config/waldur-mastermind/presets/ is mounted
+  # at /etc/waldur/presets.
+  - WALDUR_DEMO_PRESETS_EXTRA_DIRS=${WALDUR_DEMO_PRESETS_EXTRA_DIRS:-/etc/waldur/presets}
+  - WALDUR_DEMO_PRESETS_OVERLAY=${WALDUR_DEMO_PRESETS_OVERLAY:-}
+  - WALDUR_DEMO_PRESETS_STAFF_PASSWORD=${WALDUR_DEMO_PRESETS_STAFF_PASSWORD:-}
   - KEYCLOAK_SECRET=${KEYCLOAK_SECRET}
   - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT}
   # Memory tuning. Defaults match the image; override in .env to retune.
@@ -58,6 +63,7 @@ x-mastermind-volumes:
   - ${CONFIG_FOLDER}/waldur-mastermind/support.yaml:/etc/waldur/support.yaml
   - ${CONFIG_FOLDER}/waldur-mastermind/whitelabeling.yaml:/etc/waldur/whitelabeling.yaml
   - ${CONFIG_FOLDER}/waldur-mastermind/languages.yaml:/etc/waldur/languages.yaml
+  - ${CONFIG_FOLDER}/waldur-mastermind/presets:/etc/waldur/presets
   - ${CONFIG_FOLDER}/waldur-mastermind/marketplace.yaml:/etc/waldur/marketplace.yaml
   - ${CONFIG_FOLDER}/waldur-mastermind/marketplace-script.yaml:/etc/waldur/marketplace-script.yaml
   - ${CONFIG_FOLDER}/whitelabeling:/etc/waldur/icons
