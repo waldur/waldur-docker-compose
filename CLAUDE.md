@@ -69,7 +69,7 @@ docker exec -t waldur-mastermind-worker \
 
 # UI at https://localhost (self-signed cert by default)
 # API at https://localhost/api/
-# Health-check at https://localhost/health-check
+# Health-check at https://localhost/health-check/ (the trailing slash matters)
 
 docker compose down                                    # stop
 ```
