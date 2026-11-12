@@ -50,9 +50,20 @@
 		}
 	}
 
+	# A response that carries no Content-Security-Policy of its own gets the
+	# one mastermind sends on its API responses: Caddy's own answers, such as
+	# the CORS preflight below and the `respond`s in the includes, and upstream
+	# responses without one, such as the error page gunicorn writes for a
+	# request it cannot parse. `?` leaves an upstream's own policy alone. The
+	# portal's, mastermind's, Keycloak's and the web shell's pages send their
+	# own, as do the homeserver's auth fallback pages and media; the rest of
+	# what the homeserver serves here is JSON. A page served without a policy
+	# would get this one and load nothing.
+	header ?Content-Security-Policy "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+
 	# Error pages Caddy generates itself, such as a 502 while an upstream is
-	# down. They never reach homeport or mastermind, so they carry their own
-	# Content-Security-Policy, the one mastermind sends on its API responses.
+	# down. They never reach homeport or mastermind, and the header above does
+	# not apply to them, so they set the same policy themselves.
 	handle_errors {
 		header {
 			Access-Control-Allow-Origin "{header.origin}"
@@ -104,4 +115,12 @@
 	}
 
 	import /etc/caddy-includes/*.conf
+}
+
+# Any other Host over HTTPS: close the connection rather than answer with
+# Caddy's empty 200. A TLS server name other than the site's (or none, which
+# default_sni maps to it) already fails the handshake; this catches a Host
+# header that differs from the server name.
+https:// {
+	abort
 }

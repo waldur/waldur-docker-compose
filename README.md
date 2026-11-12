@@ -35,7 +35,11 @@ docker exec -t waldur-mastermind-worker waldur load_categories vpc vm storage
 Waldur HomePort will be accessible on [https://localhost](https://localhost).
 API will listen on [https://localhost/api](https://localhost/api).
 
-Healthcheck can be accessed on [https://localhost/health-check](https://localhost/health-check).
+Healthcheck can be accessed on [https://localhost/health-check/](https://localhost/health-check/).
+It answers 500 when mastermind's database, cache, storage or migrations fail,
+and 200 otherwise. A Celery worker failure is reported in the body but does not
+change the status. Keep the trailing slash: without it the request goes to
+HomePort, which answers 200 regardless.
 
 Tearing down and cleaning up:
 
@@ -380,8 +384,28 @@ The homeport image sends the portal's Content-Security-Policy (CSP) on every
 response it serves, and builds it at start from the `CSP_*` variables in `.env`.
 Caddy adds no policy to the portal's pages. It sends mastermind's API policy,
 `Content-Security-Policy: default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
-only on the error pages it generates itself, such as a 502 while a container
-is down.
+only on responses that carry none of their own: the error pages it generates
+itself, such as a 502 while a container is down, its other answers, such as
+CORS preflights, and upstream responses without a policy, such as the error
+page gunicorn writes for a request it cannot parse. A policy an upstream sends
+is passed on unchanged. Caddy closes the connection of an HTTPS request for
+any host but `WALDUR_DOMAIN`. Such a request, by IP address or with another
+`Host`, used to get an empty 200, so an external HTTPS health check that calls
+the stack by IP now fails: point it at `https://${WALDUR_DOMAIN}/health-check/`
+(with the trailing slash), for example with curl's
+`--resolve ${WALDUR_DOMAIN}:443:<ip>`.
+
+To check a deployment, look at a page that never reaches mastermind or
+homeport:
+
+```bash
+curl -sk -X OPTIONS -H 'Origin: https://example.org' -H 'Access-Control-Request-Method: POST' \
+  -D - -o /dev/null https://${WALDUR_DOMAIN}/api/ | grep -i content-security-policy
+```
+
+Caddy answers a malformed request line or an oversized header itself, before
+any of this configuration applies, with a plain-text 400 or 431 that carries
+no policy. Browsers do not render it as a page.
 
 This needs a homeport image that renders the policy from its environment.
 Older images send only `frame-ancestors 'none'; object-src 'none';
@@ -473,6 +497,11 @@ policy a response carries, so it can only tighten the portal's.
 ## Custom Caddy configuration files
 
 To add additional caddy config snippets into the caddy virtual host configuration add .conf files to config/caddy-includes/
+
+A response from such a route that carries no Content-Security-Policy gets
+mastermind's API policy, under which a page loads nothing. If the route serves
+pages, have its upstream send their policy, or set one on the route with
+`header Content-Security-Policy "..."`; Caddy keeps either.
 
 ## Keycloak
 

@@ -85,6 +85,12 @@ Test compose configuration:
     - 'curl -k -i https://docker/scim/v2/ServiceProviderConfig | grep -i "content-type: application/scim+json"'
     # /_synapse/admin/ is not proxied to the homeserver: Caddy answers 404 itself
     - 'curl -k -i https://docker/_synapse/admin/v1/register | grep "^HTTP/[0-9.]* 404"'
+    # Caddy's own answers carry mastermind's API policy; the portal keeps its own
+    - 'curl -k -i https://docker/_synapse/admin/v1/register | grep -i "content-security-policy: default-src .none.; base-uri .none.; form-action .none.; frame-ancestors .none."'
+    - 'curl -k -i -X OPTIONS -H "Origin: https://example.org" -H "Access-Control-Request-Method: POST" https://docker/api/ | grep -i "content-security-policy: default-src .none."'
+    - 'if curl -k -s -D - -o /dev/null https://docker/ | grep -i "content-security-policy: default-src .none."; then echo "the portal got the API policy"; exit 1; fi'
+    # A Host Caddy does not serve gets its connection closed, not an empty 200
+    - 'if curl -k -s -o /dev/null -H "Host: unknown.example" https://docker/; then echo "an unknown Host was answered"; exit 1; fi'
   before_script:
     - apk add curl
     - |
