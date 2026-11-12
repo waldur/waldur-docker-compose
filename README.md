@@ -374,6 +374,102 @@ so after one visit over a trusted certificate, browsers refuse plain HTTP to
 `WALDUR_DOMAIN` for a year. They ignore the header when the certificate is not
 trusted, as with `TLS=internal` without its CA installed.
 
+## Content-Security-Policy
+
+The homeport image sends the portal's Content-Security-Policy (CSP) on every
+response it serves, and builds it at start from the `CSP_*` variables in `.env`.
+Caddy adds no policy to the portal's pages. It sends mastermind's API policy,
+`Content-Security-Policy: default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
+only on the error pages it generates itself, such as a 502 while a container
+is down.
+
+This needs a homeport image that renders the policy from its environment.
+Older images send only `frame-ancestors 'none'; object-src 'none';
+base-uri 'self'`, so upgrade the stack and the image together.
+
+The API, the Matrix homeserver and LiveKit are served from `WALDUR_DOMAIN`, so
+the policy's `'self'` covers them. Set the variables for anything the portal
+loads from elsewhere; `.env.example` describes each one. Separate sources with
+spaces: a comma, `;`, a double quote, `\` or `$` in a `CSP_*` value makes the
+homeport container exit at start (only `CSP_POLICY` may hold `;`).
+
+| Variable | Adds |
+| --- | --- |
+| `CSP_SENTRY_URL` | the origin the portal's Sentry SDK reports to |
+| `CSP_MATOMO_URL` | the Matomo base URL |
+| `CSP_MATRIX_URL`, `CSP_MATRIX_CALL_URL` | a Matrix homeserver and call signalling origin on another host |
+| `CSP_INFERENCE_URL` | the inference playground origin |
+| `CSP_FORM_ACTION` | SAML identity providers that use the HTTP-POST binding (`https:` for many) |
+| `CSP_<DIRECTIVE>_EXTRA` | sources for one directive, e.g. `CSP_CONNECT_SRC_EXTRA` |
+| `CSP_POLICY` | replaces the whole policy |
+
+Recreate the homeport container after changing them:
+
+```bash
+docker compose up -d waldur-homeport
+curl -skI https://${WALDUR_DOMAIN}/ | grep -i content-security-policy
+```
+
+### Rolling out in report-only mode
+
+A policy that blocks something the portal needs breaks that part of the
+portal, so try a new one without enforcing it:
+
+1. Set `CSP_REPORT_ONLY=true` and `CSP_REPORT_URI` to an endpoint that
+   collects reports, such as a Sentry project's security endpoint. The browser
+   then reports violations but blocks nothing, except what the image keeps
+   enforced alongside:
+   `Content-Security-Policy: object-src 'none'; base-uri 'none'; frame-ancestors 'none'`.
+2. Prove that reports arrive before trusting their absence. Open the portal,
+   and in the browser console run `fetch("https://csp-check.invalid/")`. The
+   fetch fails, but the policy reports a `connect-src` violation for
+   `csp-check.invalid`. Check that it reaches the endpoint; in Sentry it shows
+   up among the project's security reports. If it does not arrive, reports are
+   not being delivered and an empty report stream proves nothing: fix the
+   delivery, or watch the browser console instead.
+3. Use the portal as people do: every sign-in method you offer, maps, Matrix
+   chat and calls, analytics consent. Watch the reports and the browser console.
+4. Add each missing source with the variables above.
+5. When nothing but your own test violation is reported, remove
+   `CSP_REPORT_ONLY` to enforce. Keep `CSP_REPORT_URI` to hear about
+   violations later.
+
+Reports go through `report-uri` by default. `CSP_REPORT_TO=true` also sends a
+`report-to` directive and a `Reporting-Endpoints` header. Chromium then reports
+only through the Reporting API and ignores `report-uri`, and those reports need
+a CORS preflight that a collector, Sentry's security endpoint among them, may
+not accept. Set `CSP_REPORT_TO` only after confirming that Reporting API
+reports arrive, for example against Sentry on staging, with the check in
+step 2. It needs `CSP_REPORT_URI`; without one the image ignores it.
+
+### Adding a source or replacing the policy
+
+`CSP_<DIRECTIVE>_EXTRA` appends sources to one directive. `DIRECTIVE` is the
+directive name upper-cased with `-` turned into `_`: `DEFAULT_SRC`,
+`SCRIPT_SRC`, `STYLE_SRC`, `IMG_SRC`, `CONNECT_SRC`, `FONT_SRC`, `MEDIA_SRC`,
+`WORKER_SRC`, `FRAME_SRC` or `FORM_ACTION`. `frame-src` is the exception to
+appending: it is `'none'` by default, and `CSP_FRAME_SRC_EXTRA` replaces
+`'none'` rather than joining it.
+
+```bash
+CSP_CONNECT_SRC_EXTRA=https://metrics.example.com
+CSP_IMG_SRC_EXTRA=https://cdn.example.com https://tiles.example.com
+```
+
+`CSP_POLICY` replaces the whole policy verbatim; `CSP_REPORT_ONLY`,
+`CSP_REPORT_URI` and `CSP_REPORT_TO` still apply. Quote it, since it contains
+semicolons. It must state `object-src`, `base-uri` and `frame-ancestors`, and
+end every directive with `;`, or the image refuses it and homeport does not
+start. A replaced policy no longer follows the portal as the image changes, so
+check it after each upgrade.
+
+```bash
+CSP_POLICY="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+```
+
+Do not add a second policy in `config/caddy-includes/`: browsers enforce every
+policy a response carries, so it can only tighten the portal's.
+
 ## Custom Caddy configuration files
 
 To add additional caddy config snippets into the caddy virtual host configuration add .conf files to config/caddy-includes/

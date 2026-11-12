@@ -280,6 +280,28 @@ services:
     environment:
       - API_URL=https://${WALDUR_DOMAIN:-localhost}/
       - TITLE=${WALDUR_TITLE:-"Waldur | Cloud Service Management"}
+      # Content-Security-Policy: the image renders the portal's policy from
+      # these, and an empty one adds nothing. See .env.example.
+      - CSP_SENTRY_URL=${CSP_SENTRY_URL:-}
+      - CSP_MATOMO_URL=${CSP_MATOMO_URL:-}
+      - CSP_MATRIX_URL=${CSP_MATRIX_URL:-}
+      - CSP_MATRIX_CALL_URL=${CSP_MATRIX_CALL_URL:-}
+      - CSP_INFERENCE_URL=${CSP_INFERENCE_URL:-}
+      - CSP_FORM_ACTION=${CSP_FORM_ACTION:-}
+      - CSP_REPORT_ONLY=${CSP_REPORT_ONLY:-}
+      - CSP_REPORT_URI=${CSP_REPORT_URI:-}
+      - CSP_REPORT_TO=${CSP_REPORT_TO:-}
+      - CSP_DEFAULT_SRC_EXTRA=${CSP_DEFAULT_SRC_EXTRA:-}
+      - CSP_SCRIPT_SRC_EXTRA=${CSP_SCRIPT_SRC_EXTRA:-}
+      - CSP_STYLE_SRC_EXTRA=${CSP_STYLE_SRC_EXTRA:-}
+      - CSP_IMG_SRC_EXTRA=${CSP_IMG_SRC_EXTRA:-}
+      - CSP_CONNECT_SRC_EXTRA=${CSP_CONNECT_SRC_EXTRA:-}
+      - CSP_FONT_SRC_EXTRA=${CSP_FONT_SRC_EXTRA:-}
+      - CSP_MEDIA_SRC_EXTRA=${CSP_MEDIA_SRC_EXTRA:-}
+      - CSP_WORKER_SRC_EXTRA=${CSP_WORKER_SRC_EXTRA:-}
+      - CSP_FRAME_SRC_EXTRA=${CSP_FRAME_SRC_EXTRA:-}
+      - CSP_FORM_ACTION_EXTRA=${CSP_FORM_ACTION_EXTRA:-}
+      - CSP_POLICY=${CSP_POLICY:-}
     volumes:
       - ${CONFIG_FOLDER}/waldur-homeport/config.template.json:/usr/share/nginx/config.template.json
       - ${CONFIG_FOLDER}/waldur-homeport/opt/waldur-homeport:/opt/waldur-homeport

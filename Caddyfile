@@ -50,20 +50,25 @@
 		}
 	}
 
+	# Error pages Caddy generates itself, such as a 502 while an upstream is
+	# down. They never reach homeport or mastermind, so they carry their own
+	# Content-Security-Policy, the one mastermind sends on its API responses.
 	handle_errors {
 		header {
 			Access-Control-Allow-Origin "{header.origin}"
 			Access-Control-Allow-Credentials "true"
 			Vary Origin
+			Content-Security-Policy "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 		}
 		respond "{http.error.status_code} {http.error.status_text}" {http.error.status_code}
 	}
 
 	import cors {header.origin}
 
+	# The homeport image sends the portal's Content-Security-Policy, built from
+	# the CSP_* variables of the waldur-homeport service.
 	reverse_proxy /* http://waldur-homeport:8080 {
 		header_down X-Frame-Options DENY
-		header_down Content-Security-Policy "base-uri 'self'; object-src 'none'; media-src https://{$VIRTUAL_HOST}/assets/ blob:; script-src 'self' 'wasm-unsafe-eval' www.google-analytics.com sentry.opnd.org; style-src 'self' 'unsafe-inline'; img-src 'self' www.google-analytics.com *.gravatar.com *.tile.openstreetmap.org {$VIRTUAL_HOST} blob: data: ; connect-src 'self' {$VIRTUAL_HOST} nominatim.openstreetmap.org:443 sentry.opnd.org:443 sentry.opnd.org:80; font-src 'self' data: ; frame-src 'none'; frame-ancestors 'none'"
 		header_down Strict-Transport-Security "max-age=31536000"
 		header_down -Server
 	}
