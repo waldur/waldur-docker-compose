@@ -11,7 +11,7 @@ waldur-docker-compose/
 ├── Caddyfile                      # Reverse proxy / TLS termination config (used by caddy-router service)
 ├── config/                        # Bind-mounted into containers
 │   ├── waldur-mastermind/         # mastermind config: auth.yaml, marketplace*.yaml, logging.conf.py, ssh keys
-│   ├── waldur-homeport/           # homeport config (config.template.json), opt/ runtime tree
+│   ├── waldur-homeport/           # homeport opt/ runtime tree
 │   ├── waldur-slurm-service/      # SLURM site-agent config (when waldur-slurm-service.yml is composed)
 │   ├── keycloak/realm.json        # Keycloak realm import (when keycloak profile is used)
 │   ├── rabbitmq.conf              # RabbitMQ config
