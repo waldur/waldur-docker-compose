@@ -303,7 +303,6 @@ services:
       - CSP_FORM_ACTION_EXTRA=${CSP_FORM_ACTION_EXTRA:-}
       - CSP_POLICY=${CSP_POLICY:-}
     volumes:
-      - ${CONFIG_FOLDER}/waldur-homeport/config.template.json:/usr/share/nginx/config.template.json
       - ${CONFIG_FOLDER}/waldur-homeport/opt/waldur-homeport:/opt/waldur-homeport
     depends_on:
       waldur-db:
