@@ -94,28 +94,79 @@ The mastermind containers mount the host's `/var/run/docker.sock`. Waldur uses
 it for one thing only: script-based offerings, whose scripts it runs in
 containers it starts through the socket. Access to the socket is equivalent to
 root on the host, so anyone who can run code in a mastermind container that can
-use it can take over the host. The `logger` service mounts it too, to read the
-other containers' logs.
+use it can take over the host.
 
-Which of the two you get depends on `DOCKER_GROUP_ID` in `.env`: the
-mastermind containers run with it as their group. Check which group owns the
-socket on the host first:
+The mastermind containers run with `DOCKER_GROUP_ID` from `.env` as their
+group, and whether they can use the socket depends on which group owns it.
+Check that on the host first:
 
 ```bash
 stat -c '%g %G' /var/run/docker.sock
 ```
 
-- **With script-based offerings**, set `DOCKER_GROUP_ID` to that group's id,
-  usually the `docker` group's. With Docker Desktop, keep the default `0`.
-- **Without them**, set `DOCKER_GROUP_ID` to a group that does not own the
-  socket, for example `65534`. The default `0` keeps the containers off the
-  socket only while the socket belongs to another group: where it is owned by
-  `root:root` (no `docker` group, some distribution packages, Podman's
-  Docker-compatible socket), group `0` gives them full access. The warning
-  about the socket that the containers log at start is then expected.
+The default `0` keeps the containers off the socket only while it belongs to
+another group. Where the socket is owned by `root:root` (no `docker` group,
+some distribution packages, Podman's Docker-compatible socket), group `0` gives
+them full access.
 
-Do not loosen the permissions of the socket itself, for example with
-`chmod 666`: that gives every user and process on the host root access.
+### With script-based offerings
+
+Set `DOCKER_GROUP_ID` to the group id `stat` printed, usually the `docker`
+group's. With Docker Desktop, keep the default `0`. Do not loosen the
+permissions of the socket itself, for example with `chmod 666`: that gives
+every user and process on the host root access.
+
+### Without script-based offerings
+
+Take the socket away from the mastermind containers. In a
+`docker-compose.override.yml` next to `docker-compose.yml`, mount an empty
+in-memory directory at the socket's path. Compose merges mounts by their path
+in the container, so this replaces the socket mount and keeps the services'
+other mounts:
+
+```yaml
+x-no-docker-socket: &no-docker-socket
+  - type: tmpfs
+    target: /var/run/docker.sock
+
+services:
+  waldur-mastermind-db-migration:
+    volumes: *no-docker-socket
+  waldur-mastermind-whitelabeling-init:
+    volumes: *no-docker-socket
+  waldur-mastermind-worker:
+    volumes: *no-docker-socket
+  waldur-mastermind-beat:
+    volumes: *no-docker-socket
+  waldur-mastermind-api:
+    volumes: *no-docker-socket
+```
+
+The override must list every service that mounts the socket: these five share
+the mount list in `docker-compose.yml`, and a service left out keeps the
+socket. After an upgrade, check that no other mastermind service has gained
+it; this lists the services that still mount it:
+
+```bash
+docker compose config --format json | python3 -c 'import json, sys; print([n for n, s in json.load(sys.stdin)["services"].items() if "/var/run/docker.sock" in [v.get("source") for v in s.get("volumes", [])]])'
+```
+
+It should print `['logger']` only. The `logger` service keeps the socket on
+purpose: it reads the other containers' logs through it. It runs no Waldur
+code and takes no requests.
+
+If the override file also mounts the terms of service and privacy policy (see
+below), list the `tmpfs` entry next to those mounts under
+`waldur-mastermind-db-migration` instead of using the anchor there.
+
+As a backstop, also set `DOCKER_GROUP_ID` to a group that does not own the
+socket, for example `65534`, so that a service the override misses still
+cannot use it. The containers own the files they write and read the mounted
+configuration through its world-readable permissions, so the group does not
+change what they can read, unless you restricted a file in `config/` to a
+group.
+
+Apply both with `docker compose up -d`.
 
 ## Upgrading Waldur
 
