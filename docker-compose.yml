@@ -10,6 +10,10 @@ x-mastermind-environment:
   - FIELD_ENCRYPTION_KEY_FALLBACKS=${FIELD_ENCRYPTION_KEY_FALLBACKS:-}
   - POSTGRESQL_HOST=waldur-db
   - POSTGRESQL_PASSWORD=${POSTGRESQL_PASSWORD}
+  # Read-only database user for the /api/query/ endpoint, which stays disabled
+  # while the user is empty. See the README for creating it.
+  - POSTGRESQL_READONLY_USER=${POSTGRESQL_READONLY_USER:-}
+  - POSTGRESQL_READONLY_PASSWORD=${POSTGRESQL_READONLY_PASSWORD:-}
   - RABBITMQ_HOST=waldur-queue
   - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
   - RABBITMQ_USERNAME=${RABBITMQ_USERNAME}
@@ -50,6 +54,15 @@ x-mastermind-environment:
   # course account APIs and the invitation webhook. Empty keeps the image
   # default. See .env.example.
   - WALDUR_USER_MANAGEMENT_API_TIMEOUT=${WALDUR_USER_MANAGEMENT_API_TIMEOUT:-}
+  # Native passkeys (FIDO2/WebAuthn), read by override.conf.py. Off until
+  # WALDUR_PASSKEY_METHODS names a flow; the relying party ID and origin
+  # default to WALDUR_DOMAIN. See .env.example.
+  - WALDUR_DOMAIN=${WALDUR_DOMAIN:-localhost}
+  - WALDUR_PASSKEY_METHODS=${WALDUR_PASSKEY_METHODS:-}
+  - WALDUR_PASSKEY_RP_ID=${WALDUR_PASSKEY_RP_ID:-}
+  - WALDUR_PASSKEY_ALLOWED_ORIGINS=${WALDUR_PASSKEY_ALLOWED_ORIGINS:-}
+  - WALDUR_PASSKEY_RP_NAME=${WALDUR_PASSKEY_RP_NAME:-}
+  - WALDUR_PASSKEY_ENFORCED_FOR_STAFF=${WALDUR_PASSKEY_ENFORCED_FOR_STAFF:-false}
 
 x-mastermind-volumes:
   &default-mastermind-volumes
@@ -76,11 +89,22 @@ x-mastermind-hosts:
   &default-mastermind-hosts
   - ${EXTRA_HOST}
 
+# Docker's own log of each container (`docker logs`), rotated so that it cannot
+# fill the disk. The logger service keeps its own copy under LOG_FOLDER, which
+# it rotates separately. See .env.example.
+x-logging:
+  &default-logging
+  driver: json-file
+  options:
+    max-size: "${DOCKER_LOG_MAX_SIZE:-50m}"
+    max-file: "${DOCKER_LOG_MAX_FILE:-5}"
+
 services:
   # PostgreSQL
   waldur-db:
     container_name: waldur-db
     image: '${DOCKER_REGISTRY_PREFIX}library/postgres:${WALDUR_POSTGRES_IMAGE_TAG}'
+    logging: *default-logging
     user: root
     environment:
       - POSTGRES_USER=waldur
@@ -104,6 +128,7 @@ services:
   waldur-queue:
     container_name: waldur-queue
     image: '${DOCKER_REGISTRY_PREFIX}library/rabbitmq:4.3.5'
+    logging: *default-logging
     environment:
       - RABBITMQ_DEFAULT_USER=${RABBITMQ_USERNAME}
       - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
@@ -115,6 +140,7 @@ services:
   # Fixing permissions of mounted script launchzone
   waldur-launchzone-init-volume:
     image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    logging: *default-logging
     user: root
     volumes:
       - waldur_script_launchzone:/var/lib/waldur/waldur-script-launchzone
@@ -125,6 +151,7 @@ services:
   waldur-mastermind-db-migration:
     container_name: waldur-mastermind-db-migration
     image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    logging: *default-logging
     user: 1001:${DOCKER_GROUP_ID}
     environment: *default-mastermind-env
     volumes: *default-mastermind-volumes
@@ -141,6 +168,7 @@ services:
   waldur-mastermind-whitelabeling-init:
     container_name: waldur-mastermind-whitelabeling-init
     image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    logging: *default-logging
     user: 1001:${DOCKER_GROUP_ID}
     environment: *default-mastermind-env
     volumes: *default-mastermind-volumes
@@ -155,6 +183,7 @@ services:
   waldur-mastermind-worker:
     container_name: waldur-mastermind-worker
     image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    logging: *default-logging
     user: 1001:${DOCKER_GROUP_ID}
     environment: *default-mastermind-env
     volumes: *default-mastermind-volumes
@@ -207,6 +236,7 @@ services:
   waldur-mastermind-beat:
     container_name: waldur-mastermind-beat
     image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    logging: *default-logging
     user: 1001:${DOCKER_GROUP_ID}
     environment: *default-mastermind-env
     volumes: *default-mastermind-volumes
@@ -228,6 +258,7 @@ services:
   waldur-mastermind-api:
     container_name: waldur-mastermind-api
     image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    logging: *default-logging
     user: 1001:${DOCKER_GROUP_ID}
     environment: *default-mastermind-env
     volumes: *default-mastermind-volumes
@@ -257,6 +288,7 @@ services:
   waldur-mastermind-web-shell:
     container_name: waldur-mastermind-web-shell
     image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    logging: *default-logging
     profiles: [web-shell]
     user: 1001:${DOCKER_GROUP_ID}
     environment: *default-mastermind-env
@@ -277,6 +309,7 @@ services:
   waldur-homeport:
     container_name: waldur-homeport
     image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-homeport:${WALDUR_HOMEPORT_IMAGE_TAG}'
+    logging: *default-logging
     environment:
       - API_URL=https://${WALDUR_DOMAIN:-localhost}/
       - TITLE=${WALDUR_TITLE:-"Waldur | Cloud Service Management"}
@@ -321,12 +354,14 @@ services:
   caddy-router:
     container_name: caddy
     image: '${DOCKER_REGISTRY_PREFIX}library/caddy:2'
+    logging: *default-logging
     ports:
       - '${WALDUR_HTTP_PORT:-80}:80'
       - '${WALDUR_HTTPS_PORT:-443}:443'
     environment:
       - VIRTUAL_HOST=${WALDUR_DOMAIN:-localhost}
       - TLS=${TLS:-"certs@waldur.com"}
+      - CADDY_TRUSTED_PROXIES=${CADDY_TRUSTED_PROXIES:-}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
       - ./config/caddy-includes/:/etc/caddy-includes
@@ -340,6 +375,7 @@ services:
   keycloak:
     container_name: keycloak
     image: '${DOCKER_REGISTRY_PREFIX}keycloak/keycloak:26.6.1'
+    logging: *default-logging
     profiles: [keycloak]
     restart: always
     environment:
@@ -372,6 +408,7 @@ services:
     container_name: keycloak-db
     profiles: [keycloak]
     image: '${DOCKER_REGISTRY_PREFIX}library/postgres:${KEYCLOAK_POSTGRES_IMAGE_TAG}'
+    logging: *default-logging
     user: root
     environment:
       - POSTGRES_USER=keycloak
@@ -400,6 +437,7 @@ services:
     container_name: waldur-matrix-init-volume
     profiles: [matrix]
     image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    logging: *default-logging
     user: root
     volumes:
       - waldur_matrix_secrets:/var/lib/waldur/matrix
@@ -410,6 +448,7 @@ services:
     container_name: waldur-matrix-init
     profiles: [matrix]
     image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    logging: *default-logging
     user: 1001:${DOCKER_GROUP_ID}
     # The default mastermind env anchor is a YAML sequence, which cannot
     # be merged with `<<:`. List the inherited vars explicitly and append
@@ -488,6 +527,7 @@ services:
     container_name: waldur-matrix-register
     profiles: [matrix]
     image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    logging: *default-logging
     user: 1001:${DOCKER_GROUP_ID}
     environment:
       - GLOBAL_SECRET_KEY=${GLOBAL_SECRET_KEY}
@@ -546,6 +586,7 @@ services:
     container_name: tuwunel
     profiles: [matrix]
     image: 'ghcr.io/matrix-construct/tuwunel:${WALDUR_TUWUNEL_IMAGE_TAG:-v1.9.3}'
+    logging: *default-logging
     restart: always
     environment:
       TUWUNEL_CONFIG: /etc/waldur/matrix/tuwunel.toml
@@ -591,6 +632,7 @@ services:
     container_name: waldur-matrix-bot
     profiles: [matrix]
     image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    logging: *default-logging
     user: 1001:${DOCKER_GROUP_ID}
     environment: *default-mastermind-env
     # Only what Django needs to start. Not the shared mastermind volumes: the
@@ -620,6 +662,7 @@ services:
     container_name: livekit-credentials-check
     profiles: [matrix-rtc]
     image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    logging: *default-logging
     environment:
       - WALDUR_DOMAIN=${WALDUR_DOMAIN:-localhost}
       - WALDUR_LIVEKIT_KEY=${WALDUR_LIVEKIT_KEY:-devkey}
@@ -633,6 +676,7 @@ services:
     container_name: livekit
     profiles: [matrix-rtc]
     image: 'livekit/livekit-server:${WALDUR_LIVEKIT_IMAGE_TAG:-v1.13.7}'
+    logging: *default-logging
     restart: always
     depends_on:
       livekit-credentials-check:

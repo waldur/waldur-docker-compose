@@ -1,9 +1,15 @@
 # Waldur Docker-compose deployment
 
+> **Production use.** This stack runs all of Waldur on a single host. Before
+> it serves real users, work through the
+> [go-live checklist](https://docs.waldur.com/latest/admin-guide/checklist-for-production/).
+
 ## Prerequisites
 
 - at least 8GB RAM on Docker Host to run all containers
-- Docker v1.13+
+- Docker Engine with the Docker Compose plugin, version 2.20 or later. The
+  commands below use `docker compose`; the standalone `docker-compose` v1 is not
+  supported.
 
 ## Prepare environment
 
@@ -11,9 +17,17 @@
 # clone repo
 git clone https://github.com/waldur/waldur-docker-compose.git
 cd waldur-docker-compose
+# check out the latest release
+git checkout "$(git tag --list '[0-9]*' --sort=-version:refname | grep -v -- -rc | head -n 1)"
 # setup settings
 cp .env.example .env
 ```
+
+Run a release, not the default branch. `develop` is where the next release is
+prepared, and its `.env.example` pins release-candidate images. Releases are
+tagged `X.Y.Z` and release candidates `X.Y.Z-rc.N`; the command above checks
+out the newest release. All tags are listed at
+<https://github.com/waldur/waldur-docker-compose/tags>.
 
 ## Booting up
 
@@ -64,29 +78,117 @@ membership or ACLs instead.
 Each time `logger` starts, it re-reads the last 10 lines of every container it follows, so a restart
 repeats up to 10 lines per log file.
 
+Docker also keeps its own log of each container, the one `docker logs` shows. It is rotated at
+`DOCKER_LOG_MAX_SIZE` (default `50m`), keeping `DOCKER_LOG_MAX_FILE` files (default `5`) per
+container, so each container uses at most about 250 MB of disk for it by default.
+
 ## Known issues
 
 When Waldur is launched for the first time, it applies initial database migrations.
 It means that you may need to wait few minutes until these migrations are applied.
 Otherwise you may observe HTTP error 500 rendered by REST API server.
-This issue would be resolved after upgrade to [Docker Compose 1.29](https://docs.docker.com/compose/release-notes/#1290).
 
-To use a custom script offering type, it should be possible to connect to `/var/run/docker.sock` from
-within the Waldur containers. If you are getting a permission denied error in logs, try setting more
-open permissions, for example, `chmod 666 /var/run/docker.sock`. Note that this is not a secure
-setup, so make sure you understand what you are doing.
+## Docker socket and script-based offerings
+
+The mastermind containers mount the host's `/var/run/docker.sock`. Waldur uses
+it for one thing only: script-based offerings, whose scripts it runs in
+containers it starts through the socket. Access to the socket is equivalent to
+root on the host, so anyone who can run code in a mastermind container that can
+use it can take over the host.
+
+The mastermind containers run with `DOCKER_GROUP_ID` from `.env` as their
+group, and whether they can use the socket depends on which group owns it.
+Check that on the host first:
+
+```bash
+stat -c '%g %G' /var/run/docker.sock
+```
+
+The default `0` keeps the containers off the socket only while it belongs to
+another group. Where the socket is owned by `root:root` (no `docker` group,
+some distribution packages, Podman's Docker-compatible socket), group `0` gives
+them full access.
+
+### With script-based offerings
+
+Set `DOCKER_GROUP_ID` to the group id `stat` printed, usually the `docker`
+group's. With Docker Desktop, keep the default `0`. Do not loosen the
+permissions of the socket itself, for example with `chmod 666`: that gives
+every user and process on the host root access.
+
+### Without script-based offerings
+
+Take the socket away from the mastermind containers. In a
+`docker-compose.override.yml` next to `docker-compose.yml`, mount an empty
+in-memory directory at the socket's path. Compose merges mounts by their path
+in the container, so this replaces the socket mount and keeps the services'
+other mounts:
+
+```yaml
+x-no-docker-socket: &no-docker-socket
+  - type: tmpfs
+    target: /var/run/docker.sock
+
+services:
+  waldur-mastermind-db-migration:
+    volumes: *no-docker-socket
+  waldur-mastermind-whitelabeling-init:
+    volumes: *no-docker-socket
+  waldur-mastermind-worker:
+    volumes: *no-docker-socket
+  waldur-mastermind-beat:
+    volumes: *no-docker-socket
+  waldur-mastermind-api:
+    volumes: *no-docker-socket
+```
+
+The override must list every service that mounts the socket: these five share
+the mount list in `docker-compose.yml`, and a service left out keeps the
+socket. After an upgrade, check that no other mastermind service has gained
+it; this lists the services that still mount it:
+
+```bash
+docker compose config --format json | python3 -c 'import json, sys; print([n for n, s in json.load(sys.stdin)["services"].items() if "/var/run/docker.sock" in [v.get("source") for v in s.get("volumes", [])]])'
+```
+
+It should print `['logger']` only. The `logger` service keeps the socket on
+purpose: it reads the other containers' logs through it. It runs no Waldur
+code and takes no requests.
+
+If the override file also mounts the terms of service and privacy policy (see
+below), list the `tmpfs` entry next to those mounts under
+`waldur-mastermind-db-migration` instead of using the anchor there.
+
+As a backstop, also set `DOCKER_GROUP_ID` to a group that does not own the
+socket, for example `65534`, so that a service the override misses still
+cannot use it. The containers own the files they write and read the mounted
+configuration through its world-readable permissions, so the group does not
+change what they can read, unless you restricted a file in `config/` to a
+group.
+
+Apply both with `docker compose up -d`.
 
 ## Upgrading Waldur
 
-Your `.env` keeps the image tags it was copied with. First set
-`WALDUR_MASTERMIND_IMAGE_TAG` and `WALDUR_HOMEPORT_IMAGE_TAG` to the versions
-`.env.example` pins: the files of a release expect the images of that release.
+Your `.env` keeps the image tags it was copied with. First check out the new
+release, then set `WALDUR_MASTERMIND_IMAGE_TAG` and `WALDUR_HOMEPORT_IMAGE_TAG`
+to the versions its `.env.example` pins: the files of a release expect the
+images of that release.
 
 ```bash
+git fetch --tags
+git checkout <new release tag>
+# set the image tags in .env, then:
 docker compose pull
 docker compose down
 docker compose up -d
 ```
+
+If you have changed files the repository tracks, such as
+`config/waldur-mastermind/override.conf.py` or `whitelabeling.yaml`, `git
+checkout` refuses to overwrite them. Keep those changes as commits on a local
+branch instead, and bring each release in with `git merge <new release tag>`,
+resolving any conflict in favour of your settings plus the release's new ones.
 
 With the Matrix chat add-on, set `COMPOSE_PROFILES` in `.env` as described in
 `docs/matrix-chat-add-on.md`, or pass the same `--profile` flags to each of
@@ -345,6 +447,44 @@ Full reference: [Email configuration][email-docs] in the admin guide.
 
 [email-docs]: https://docs.waldur.com/latest/admin-guide/mastermind-configuration/email/
 
+## Terms of service and privacy policy
+
+On each start, `waldur-mastermind-db-migration` runs `initdb`, which loads the
+terms of service from `/etc/waldur/terms-of-service.html` and the privacy policy
+from `/etc/waldur/privacy-policy.html`. The stack mounts neither file, so until
+you provide them nothing is loaded: recent images log a warning naming the
+missing file, older ones say nothing. Put your own files in
+`config/waldur-mastermind/` and mount them into that service in a
+`docker-compose.override.yml` next to `docker-compose.yml`, which Docker Compose
+reads automatically when no `-f` is given:
+
+```yaml
+services:
+  waldur-mastermind-db-migration:
+    volumes:
+      - ${CONFIG_FOLDER}/waldur-mastermind/terms-of-service.html:/etc/waldur/terms-of-service.html:ro
+      - ${CONFIG_FOLDER}/waldur-mastermind/privacy-policy.html:/etc/waldur/privacy-policy.html:ro
+```
+
+Create both files first, readable by others (mode `0644`): Docker turns a
+missing source into an empty directory, and a document that cannot be read is
+skipped too. `docker compose up -d` then recreates the service
+with the new mounts and loads them.
+
+`initdb` loads a document only while the database has none, so a later change
+to a file is not picked up. Edit the documents in the portal under
+**Administration → Compliance → User agreements**, or load the files again with
+`--force`. The service is not running after `initdb` finishes, so use `run`
+rather than `exec`:
+
+```bash
+docker compose run --rm --no-deps waldur-mastermind-db-migration \
+  waldur load_user_agreements \
+  --tos /etc/waldur/terms-of-service.html \
+  --pp /etc/waldur/privacy-policy.html \
+  --force
+```
+
 ## Using TLS
 
 This setup supports following types of SSL certificates:
@@ -377,6 +517,64 @@ Caddy sends `Strict-Transport-Security: max-age=31536000` with HomePort's pages,
 so after one visit over a trusted certificate, browsers refuse plain HTTP to
 `WALDUR_DOMAIN` for a year. They ignore the header when the certificate is not
 trusted, as with `TLS=internal` without its CA installed.
+
+## Behind a load balancer
+
+Caddy normally replaces `X-Forwarded-For` with the address that connected to
+it. That is right when clients connect to Caddy directly, but behind a load
+balancer every request then comes from the balancer's address. Waldur's limit
+on failed passwords per address then treats all users as one client: after
+`PASSWORD_FAILURES_PER_ADDRESS_LIMIT` failures from anyone, password sign-in is
+blocked for everyone for the cool-off period. (The account lockout counts per
+username and is not affected.)
+
+To pass on the client address the balancer reports:
+
+1. Set `CADDY_TRUSTED_PROXIES` in `.env` to the balancer's addresses or CIDR
+   ranges, space-separated. Caddy then takes the client from the balancer's
+   `X-Forwarded-For` entry, reading the header from the right and skipping
+   only trusted proxies, and sends Waldur that address followed by the
+   balancer's. Entries a client wrote itself are dropped.
+2. Tell Waldur that two proxies add an entry, in
+   `config/waldur-mastermind/override.conf.py`:
+
+   ```python
+   WALDUR_CORE["TRUSTED_PROXY_COUNT"] = 2
+   ```
+
+3. Apply both. `docker compose up -d` recreates Caddy, whose environment
+   changed, but not the mastermind containers: `override.conf.py` is mounted
+   from the host, so editing it changes nothing Compose compares, and each
+   process reads it only when it starts. Restart the long-running ones:
+
+   ```bash
+   docker compose up -d
+   docker compose restart waldur-mastermind-api waldur-mastermind-worker waldur-mastermind-beat
+   ```
+
+   Add `waldur-mastermind-web-shell` and `waldur-matrix-bot` to the restart
+   when their profiles are on. The one-shot services read the file on their
+   next run.
+
+Check it: after a failed sign-in, **Django admin → Axes → Access attempts**
+shows your own address, not the balancer's.
+
+List only the balancer. Caddy believes whatever a trusted proxy puts in the
+header, so a range that also covers clients, such as `private_ranges` on a
+network where users sit, lets those clients choose the address Waldur sees.
+
+Make Caddy reachable only through the balancer as well. A client that connects
+to Caddy directly is not trusted, so its request reaches Waldur with a single
+`X-Forwarded-For` entry, its own address. With `TRUSTED_PROXY_COUNT` at 2 that
+is one entry too few, and Waldur falls back to the address the request came
+from, which is Caddy's container: every client that bypasses the balancer then
+shares one address for the limit.
+
+Because Caddy sends only the resolved address, the features that read the
+first `X-Forwarded-For` entry rather than counting from the right see the
+same client: the network restrictions of personal access tokens, organization
+access subnets, the network rules that hide marketplace resources, and the
+address in the event log.
 
 ## Content-Security-Policy
 
@@ -596,9 +794,18 @@ The endpoint executes caller-supplied SQL against the read replica, so the calli
 
 ### 1. Create PostgreSQL readonly user
 
+Run the statements below as the `waldur` database user, for example in
+`docker exec -it waldur-db psql -U waldur -d waldur`. The
+`ALTER ROLE` line is required: Waldur opens this connection with
+`target_session_attrs=read-only`, which refuses a session that accepts writes,
+so without it every query fails with `session is not read-only`.
+
 ```sql
 -- Create a read-only user
-CREATE USER readonly WITH PASSWORD '{readonly_password}';
+CREATE USER {readonly_username} WITH PASSWORD '{readonly_password}';
+
+-- Make its sessions read-only by default
+ALTER ROLE {readonly_username} SET default_transaction_read_only = on;
 
 -- Grant read-only access to the database
 GRANT CONNECT ON DATABASE {database_name} TO {readonly_username};
@@ -625,7 +832,13 @@ POSTGRESQL_READONLY_USER={readonly_username}
 POSTGRESQL_READONLY_PASSWORD={readonly_password}
 ```
 
-**Note**: Replace `{readonly_password}` with the actual password you used when creating the readonly user, and `{readonly_username}` with your chosen readonly username (e.g., "readonly").
+**Note**: Replace `{readonly_password}` with the actual password you used when creating the readonly user, `{readonly_username}` with your chosen readonly username (e.g., "readonly"), and `{database_name}` with `waldur`.
+
+Then recreate the containers so that they pick the variables up:
+
+```bash
+docker compose up -d
+```
 
 ## Migration from bitnami/postgresql to library/postgres DB image
 

@@ -1,5 +1,16 @@
 {
 	default_sni {$VIRTUAL_HOST}
+
+	# Proxies in front of Caddy, such as a load balancer: CADDY_TRUSTED_PROXIES
+	# in .env, a space-separated list of addresses or CIDR ranges. Empty trusts
+	# none. With strict parsing, the client is the last X-Forwarded-For entry
+	# that is not a trusted proxy, so entries a client wrote itself are never
+	# taken for its address. Global options: config/caddy-includes/ cannot set
+	# them.
+	servers {
+		trusted_proxies static {$CADDY_TRUSTED_PROXIES}
+		trusted_proxies_strict
+	}
 }
 
 (cors) {
@@ -73,6 +84,13 @@
 		}
 		respond "{http.error.status_code} {http.error.status_text}" {http.error.status_code}
 	}
+
+	# Send Waldur only the client address resolved above: without trusted
+	# proxies, the address that connected, as before; behind a trusted load
+	# balancer, the address it reports, followed by the balancer's own. Entries
+	# a client wrote itself are dropped, so every Waldur feature sees the same
+	# address.
+	request_header X-Forwarded-For {client_ip}
 
 	import cors {header.origin}
 

@@ -1,32 +1,16 @@
-# Expected file list
+# HomePort customisation
 
-- login-logo.png
-- sidebar-logo.png
-- privacy.html
-- privacy-full.html
-- tos.html
-- favicon.ico
+This folder is mounted at `/opt/waldur-homeport` in the `waldur-homeport`
+container, but the HomePort image reads nothing from it. Files placed here have
+no effect. Customise the portal where the settings are actually read:
 
-Don't forget to adjust `config/waldur-homeport/nginx.conf`, e.g.:
-
-```nginx
-    location /login-logo.png {
-        alias /opt/waldur-homeport/login-logo.png;
-    }
-
-    location /sidebar-logo.png {
-        alias /opt/waldur-homeport/sidebar-logo.png;
-    }
-
-    location /views/policy/privacy.html {
-        alias /opt/waldur-homeport/privacy.html;
-    }
-
-    location /views/policy/privacy-full.html {
-        alias /opt/waldur-homeport/privacy-full.html;
-    }
-
-    location /views/tos/index.html {
-        alias /opt/waldur-homeport/tos.html;
-    }
-```
+- **Logos and favicon**: put the images in `config/whitelabeling/` and refer to
+  them in `config/waldur-mastermind/whitelabeling.yaml` as
+  `/etc/waldur/icons/<file name>`, for example `login_logo`, `sidebar_logo`
+  and `favicon`. HomePort fetches them from the API.
+- **Terms of service and privacy policy**: these are stored by mastermind and
+  loaded from HTML files by the `waldur-mastermind-db-migration` service. See
+  "Terms of service and privacy policy" in the top-level `README.md`.
+- **Page title**: `WALDUR_TITLE` in `.env`.
+- **Content-Security-Policy and other response headers**: the image generates
+  its nginx configuration at start; set the `CSP_*` variables in `.env`.
