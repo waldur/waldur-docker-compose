@@ -10,6 +10,10 @@ x-mastermind-environment:
   - FIELD_ENCRYPTION_KEY_FALLBACKS=${FIELD_ENCRYPTION_KEY_FALLBACKS:-}
   - POSTGRESQL_HOST=waldur-db
   - POSTGRESQL_PASSWORD=${POSTGRESQL_PASSWORD}
+  # Read-only database user for the /api/query/ endpoint, which stays disabled
+  # while the user is empty. See the README for creating it.
+  - POSTGRESQL_READONLY_USER=${POSTGRESQL_READONLY_USER:-}
+  - POSTGRESQL_READONLY_PASSWORD=${POSTGRESQL_READONLY_PASSWORD:-}
   - RABBITMQ_HOST=waldur-queue
   - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
   - RABBITMQ_USERNAME=${RABBITMQ_USERNAME}
@@ -50,6 +54,15 @@ x-mastermind-environment:
   # course account APIs and the invitation webhook. Empty keeps the image
   # default. See .env.example.
   - WALDUR_USER_MANAGEMENT_API_TIMEOUT=${WALDUR_USER_MANAGEMENT_API_TIMEOUT:-}
+  # Native passkeys (FIDO2/WebAuthn), read by override.conf.py. Off until
+  # WALDUR_PASSKEY_METHODS names a flow; the relying party ID and origin
+  # default to WALDUR_DOMAIN. See .env.example.
+  - WALDUR_DOMAIN=${WALDUR_DOMAIN:-localhost}
+  - WALDUR_PASSKEY_METHODS=${WALDUR_PASSKEY_METHODS:-}
+  - WALDUR_PASSKEY_RP_ID=${WALDUR_PASSKEY_RP_ID:-}
+  - WALDUR_PASSKEY_ALLOWED_ORIGINS=${WALDUR_PASSKEY_ALLOWED_ORIGINS:-}
+  - WALDUR_PASSKEY_RP_NAME=${WALDUR_PASSKEY_RP_NAME:-}
+  - WALDUR_PASSKEY_ENFORCED_FOR_STAFF=${WALDUR_PASSKEY_ENFORCED_FOR_STAFF:-false}
 
 x-mastermind-volumes:
   &default-mastermind-volumes
