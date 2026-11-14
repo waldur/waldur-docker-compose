@@ -674,9 +674,18 @@ The endpoint executes caller-supplied SQL against the read replica, so the calli
 
 ### 1. Create PostgreSQL readonly user
 
+Run the statements below as the `waldur` database user, for example in
+`docker exec -it waldur-db psql -U waldur -d waldur`. The
+`ALTER ROLE` line is required: Waldur opens this connection with
+`target_session_attrs=read-only`, which refuses a session that accepts writes,
+so without it every query fails with `session is not read-only`.
+
 ```sql
 -- Create a read-only user
-CREATE USER readonly WITH PASSWORD '{readonly_password}';
+CREATE USER {readonly_username} WITH PASSWORD '{readonly_password}';
+
+-- Make its sessions read-only by default
+ALTER ROLE {readonly_username} SET default_transaction_read_only = on;
 
 -- Grant read-only access to the database
 GRANT CONNECT ON DATABASE {database_name} TO {readonly_username};
@@ -703,7 +712,13 @@ POSTGRESQL_READONLY_USER={readonly_username}
 POSTGRESQL_READONLY_PASSWORD={readonly_password}
 ```
 
-**Note**: Replace `{readonly_password}` with the actual password you used when creating the readonly user, and `{readonly_username}` with your chosen readonly username (e.g., "readonly").
+**Note**: Replace `{readonly_password}` with the actual password you used when creating the readonly user, `{readonly_username}` with your chosen readonly username (e.g., "readonly"), and `{database_name}` with `waldur`.
+
+Then recreate the containers so that they pick the variables up:
+
+```bash
+docker compose up -d
+```
 
 ## Migration from bitnami/postgresql to library/postgres DB image
 
