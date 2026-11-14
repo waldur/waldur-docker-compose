@@ -1,5 +1,9 @@
 # Waldur Docker-compose deployment
 
+> **Production use.** This stack runs all of Waldur on a single host. Before
+> it serves real users, work through the
+> [checklist for production](https://docs.waldur.com/latest/admin-guide/checklist-for-production/).
+
 ## Prerequisites
 
 - at least 8GB RAM on Docker Host to run all containers
