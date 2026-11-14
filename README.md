@@ -88,10 +88,30 @@ When Waldur is launched for the first time, it applies initial database migratio
 It means that you may need to wait few minutes until these migrations are applied.
 Otherwise you may observe HTTP error 500 rendered by REST API server.
 
-To use a custom script offering type, it should be possible to connect to `/var/run/docker.sock` from
-within the Waldur containers. If you are getting a permission denied error in logs, try setting more
-open permissions, for example, `chmod 666 /var/run/docker.sock`. Note that this is not a secure
-setup, so make sure you understand what you are doing.
+## Docker socket and script-based offerings
+
+The mastermind containers mount the host's `/var/run/docker.sock`. Waldur uses
+it for one thing only: script-based offerings, whose scripts it runs in
+containers it starts through the socket. Access to the socket is equivalent to
+root on the host, so anyone who can run code in a mastermind container that can
+use it can take over the host. The `logger` service mounts it too, to read the
+other containers' logs.
+
+To use script-based offerings, let the containers reach the socket through the
+host's `docker` group. Set `DOCKER_GROUP_ID` in `.env` to that group's id; the
+mastermind containers run with it as their group:
+
+```bash
+getent group docker | cut -d: -f3
+```
+
+With Docker Desktop, keep the default `0`. Do not loosen the permissions of the
+socket itself, for example with `chmod 666`: that gives every user and process
+on the host root access.
+
+Without script-based offerings, leave `DOCKER_GROUP_ID` at `0` on a Linux host.
+The socket normally belongs to the `docker` group there, so the containers
+cannot use it, and the warning about the socket they log at start is expected.
 
 ## Upgrading Waldur
 
