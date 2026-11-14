@@ -514,8 +514,9 @@ from, which is Caddy's container: every client that bypasses the balancer then
 shares one address for the lockout.
 
 Some features read the first `X-Forwarded-For` entry instead: the network
-restrictions of personal access tokens, organization access subnets, and the
-address in the event log. Once Caddy keeps the incoming header, that entry is
+restrictions of personal access tokens, organization access subnets, the
+network rules that hide marketplace resources, and the address in the event
+log. Once Caddy keeps the incoming header, that entry is
 whatever the client sent if the balancer appends to the header rather than
 replacing it. If you rely on those features, have the balancer replace the
 header.
