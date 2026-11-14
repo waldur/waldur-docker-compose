@@ -1,6 +1,15 @@
+# Same rotation as docker-compose.yml: an anchor does not reach across files.
+x-logging:
+  &default-logging
+  driver: json-file
+  options:
+    max-size: "${DOCKER_LOG_MAX_SIZE:-50m}"
+    max-file: "${DOCKER_LOG_MAX_FILE:-5}"
+
 services:
   slurm_service_pull:
     image: opennode/waldur-slurm-service:latest
+    logging: *default-logging
     container_name: waldur_slurm_service_pull
     env_file: ${CONFIG_FOLDER}/waldur-slurm-service/service-pull-env
     volumes:
@@ -8,6 +17,7 @@ services:
 
   slurm_service_push:
     image: opennode/waldur-slurm-service:latest
+    logging: *default-logging
     container_name: waldur_slurm_service_push
     env_file: ${CONFIG_FOLDER}/waldur-slurm-service/service-push-env
     volumes:

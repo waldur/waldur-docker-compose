@@ -64,6 +64,10 @@ membership or ACLs instead.
 Each time `logger` starts, it re-reads the last 10 lines of every container it follows, so a restart
 repeats up to 10 lines per log file.
 
+Docker also keeps its own log of each container, the one `docker logs` shows. It is rotated at
+`DOCKER_LOG_MAX_SIZE` (default `50m`), keeping `DOCKER_LOG_MAX_FILE` files (default `5`) per
+container, so each container uses at most about 250 MB of disk for it by default.
+
 ## Known issues
 
 When Waldur is launched for the first time, it applies initial database migrations.
