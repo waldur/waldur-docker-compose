@@ -2,7 +2,7 @@
 
 > **Production use.** This stack runs all of Waldur on a single host. Before
 > it serves real users, work through the
-> [checklist for production](https://docs.waldur.com/latest/admin-guide/checklist-for-production/).
+> [go-live checklist](https://docs.waldur.com/latest/admin-guide/checklist-for-production/).
 
 ## Prerequisites
 
@@ -391,7 +391,8 @@ Full reference: [Email configuration][email-docs] in the admin guide.
 On each start, `waldur-mastermind-db-migration` runs `initdb`, which loads the
 terms of service from `/etc/waldur/terms-of-service.html` and the privacy policy
 from `/etc/waldur/privacy-policy.html`. The stack mounts neither file, so until
-you provide them nothing is loaded and nothing says so. Put your own files in
+you provide them nothing is loaded: recent images log a warning naming the
+missing file, older ones say nothing. Put your own files in
 `config/waldur-mastermind/` and mount them into that service in a
 `docker-compose.override.yml` next to `docker-compose.yml`, which Docker Compose
 reads automatically when no `-f` is given:
@@ -406,7 +407,7 @@ services:
 
 Create both files first, readable by others (mode `0644`): Docker turns a
 missing source into an empty directory, and a document that cannot be read is
-skipped just as silently. `docker compose up -d` then recreates the service
+skipped too. `docker compose up -d` then recreates the service
 with the new mounts and loads them.
 
 `initdb` loads a document only while the database has none, so a later change
