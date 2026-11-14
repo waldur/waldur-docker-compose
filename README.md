@@ -97,21 +97,25 @@ root on the host, so anyone who can run code in a mastermind container that can
 use it can take over the host. The `logger` service mounts it too, to read the
 other containers' logs.
 
-To use script-based offerings, let the containers reach the socket through the
-host's `docker` group. Set `DOCKER_GROUP_ID` in `.env` to that group's id; the
-mastermind containers run with it as their group:
+Which of the two you get depends on `DOCKER_GROUP_ID` in `.env`: the
+mastermind containers run with it as their group. Check which group owns the
+socket on the host first:
 
 ```bash
-getent group docker | cut -d: -f3
+stat -c '%g %G' /var/run/docker.sock
 ```
 
-With Docker Desktop, keep the default `0`. Do not loosen the permissions of the
-socket itself, for example with `chmod 666`: that gives every user and process
-on the host root access.
+- **With script-based offerings**, set `DOCKER_GROUP_ID` to that group's id,
+  usually the `docker` group's. With Docker Desktop, keep the default `0`.
+- **Without them**, set `DOCKER_GROUP_ID` to a group that does not own the
+  socket, for example `65534`. The default `0` keeps the containers off the
+  socket only while the socket belongs to another group: where it is owned by
+  `root:root` (no `docker` group, some distribution packages, Podman's
+  Docker-compatible socket), group `0` gives them full access. The warning
+  about the socket that the containers log at start is then expected.
 
-Without script-based offerings, leave `DOCKER_GROUP_ID` at `0` on a Linux host.
-The socket normally belongs to the `docker` group there, so the containers
-cannot use it, and the warning about the socket they log at start is expected.
+Do not loosen the permissions of the socket itself, for example with
+`chmod 666`: that gives every user and process on the host root access.
 
 ## Upgrading Waldur
 
