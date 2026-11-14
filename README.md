@@ -7,7 +7,9 @@
 ## Prerequisites
 
 - at least 8GB RAM on Docker Host to run all containers
-- Docker v1.13+
+- Docker Engine with the Docker Compose plugin, version 2.20 or later. The
+  commands below use `docker compose`; the standalone `docker-compose` v1 is not
+  supported.
 
 ## Prepare environment
 
@@ -85,7 +87,6 @@ container, so each container uses at most about 250 MB of disk for it by default
 When Waldur is launched for the first time, it applies initial database migrations.
 It means that you may need to wait few minutes until these migrations are applied.
 Otherwise you may observe HTTP error 500 rendered by REST API server.
-This issue would be resolved after upgrade to [Docker Compose 1.29](https://docs.docker.com/compose/release-notes/#1290).
 
 To use a custom script offering type, it should be possible to connect to `/var/run/docker.sock` from
 within the Waldur containers. If you are getting a permission denied error in logs, try setting more
