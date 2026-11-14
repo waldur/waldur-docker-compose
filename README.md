@@ -11,9 +11,17 @@
 # clone repo
 git clone https://github.com/waldur/waldur-docker-compose.git
 cd waldur-docker-compose
+# check out the latest release
+git checkout "$(git tag --list '[0-9]*' --sort=-version:refname | grep -v -- -rc | head -n 1)"
 # setup settings
 cp .env.example .env
 ```
+
+Run a release, not the default branch. `develop` is where the next release is
+prepared, and its `.env.example` pins release-candidate images. Releases are
+tagged `X.Y.Z` and release candidates `X.Y.Z-rc.N`; the command above checks
+out the newest release. All tags are listed at
+<https://github.com/waldur/waldur-docker-compose/tags>.
 
 ## Booting up
 
@@ -82,11 +90,15 @@ setup, so make sure you understand what you are doing.
 
 ## Upgrading Waldur
 
-Your `.env` keeps the image tags it was copied with. First set
-`WALDUR_MASTERMIND_IMAGE_TAG` and `WALDUR_HOMEPORT_IMAGE_TAG` to the versions
-`.env.example` pins: the files of a release expect the images of that release.
+Your `.env` keeps the image tags it was copied with. First check out the new
+release, then set `WALDUR_MASTERMIND_IMAGE_TAG` and `WALDUR_HOMEPORT_IMAGE_TAG`
+to the versions its `.env.example` pins: the files of a release expect the
+images of that release.
 
 ```bash
+git fetch --tags
+git checkout <new release tag>
+# set the image tags in .env, then:
 docker compose pull
 docker compose down
 docker compose up -d
