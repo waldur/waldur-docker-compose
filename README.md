@@ -492,8 +492,14 @@ To keep the client address the balancer reports:
 
 List only the balancer. A range that also covers clients, such as
 `private_ranges` on a network where users sit, lets those clients choose the
-address Waldur sees, and so the address the lockout counts against. Make
-Caddy reachable only through the balancer for the same reason.
+address Waldur sees, and so the address the lockout counts against.
+
+Make Caddy reachable only through the balancer as well. A client that connects
+to Caddy directly is not trusted, so its request reaches Waldur with a single
+`X-Forwarded-For` entry, its own address. With `TRUSTED_PROXY_COUNT` at 2 that
+is one entry too few, and Waldur falls back to the address the request came
+from, which is Caddy's container: every client that bypasses the balancer then
+shares one address for the lockout.
 
 Some features read the first `X-Forwarded-For` entry instead: the network
 restrictions of personal access tokens, organization access subnets, and the
