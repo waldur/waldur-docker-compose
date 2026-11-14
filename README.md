@@ -133,6 +133,12 @@ docker compose down
 docker compose up -d
 ```
 
+If you have changed files the repository tracks, such as
+`config/waldur-mastermind/override.conf.py` or `whitelabeling.yaml`, `git
+checkout` refuses to overwrite them. Keep those changes as commits on a local
+branch instead, and bring each release in with `git merge <new release tag>`,
+resolving any conflict in favour of your settings plus the release's new ones.
+
 With the Matrix chat add-on, set `COMPOSE_PROFILES` in `.env` as described in
 `docs/matrix-chat-add-on.md`, or pass the same `--profile` flags to each of
 these commands. Without the profiles, `pull` and `up -d` neither update nor
