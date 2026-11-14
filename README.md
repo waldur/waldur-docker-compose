@@ -386,6 +386,43 @@ Full reference: [Email configuration][email-docs] in the admin guide.
 
 [email-docs]: https://docs.waldur.com/latest/admin-guide/mastermind-configuration/email/
 
+## Terms of service and privacy policy
+
+On each start, `waldur-mastermind-db-migration` runs `initdb`, which loads the
+terms of service from `/etc/waldur/terms-of-service.html` and the privacy policy
+from `/etc/waldur/privacy-policy.html`. The stack mounts neither file, so until
+you provide them nothing is loaded and nothing says so. Put your own files in
+`config/waldur-mastermind/` and mount them into that service in a
+`docker-compose.override.yml` next to `docker-compose.yml`, which Docker Compose
+reads automatically when no `-f` is given:
+
+```yaml
+services:
+  waldur-mastermind-db-migration:
+    volumes:
+      - ${CONFIG_FOLDER}/waldur-mastermind/terms-of-service.html:/etc/waldur/terms-of-service.html:ro
+      - ${CONFIG_FOLDER}/waldur-mastermind/privacy-policy.html:/etc/waldur/privacy-policy.html:ro
+```
+
+Create both files first, readable by others (mode `0644`): Docker turns a
+missing source into an empty directory, and a document that cannot be read is
+skipped just as silently. `docker compose up -d` then recreates the service
+with the new mounts and loads them.
+
+`initdb` loads a document only while the database has none, so a later change
+to a file is not picked up. Edit the documents in the portal under
+**Administration → Compliance → User agreements**, or load the files again with
+`--force`. The service is not running after `initdb` finishes, so use `run`
+rather than `exec`:
+
+```bash
+docker compose run --rm --no-deps waldur-mastermind-db-migration \
+  waldur load_user_agreements \
+  --tos /etc/waldur/terms-of-service.html \
+  --pp /etc/waldur/privacy-policy.html \
+  --force
+```
+
 ## Using TLS
 
 This setup supports following types of SSL certificates:
