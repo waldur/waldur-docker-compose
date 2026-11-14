@@ -488,7 +488,19 @@ To keep the client address the balancer reports:
    WALDUR_CORE["TRUSTED_PROXY_COUNT"] = 2
    ```
 
-3. Recreate the containers: `docker compose up -d`.
+3. Apply both. `docker compose up -d` recreates Caddy, whose environment
+   changed, but not the mastermind containers: `override.conf.py` is mounted
+   from the host, so editing it changes nothing Compose compares, and each
+   process reads it only when it starts. Restart the long-running ones:
+
+   ```bash
+   docker compose up -d
+   docker compose restart waldur-mastermind-api waldur-mastermind-worker waldur-mastermind-beat
+   ```
+
+   Add `waldur-mastermind-web-shell` and `waldur-matrix-bot` to the restart
+   when their profiles are on. The one-shot services read the file on their
+   next run.
 
 List only the balancer. A range that also covers clients, such as
 `private_ranges` on a network where users sit, lets those clients choose the
