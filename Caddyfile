@@ -1,5 +1,14 @@
 {
 	default_sni {$VIRTUAL_HOST}
+
+	# Proxies in front of Caddy, such as a load balancer, whose
+	# X-Forwarded-For entries Caddy keeps: CADDY_TRUSTED_PROXIES in .env, a
+	# space-separated list of addresses or CIDR ranges. Empty trusts none, and
+	# Caddy replaces the header with the address that connected to it. This has
+	# to be a global option: it cannot be set from config/caddy-includes/.
+	servers {
+		trusted_proxies static {$CADDY_TRUSTED_PROXIES}
+	}
 }
 
 (cors) {

@@ -361,6 +361,7 @@ services:
     environment:
       - VIRTUAL_HOST=${WALDUR_DOMAIN:-localhost}
       - TLS=${TLS:-"certs@waldur.com"}
+      - CADDY_TRUSTED_PROXIES=${CADDY_TRUSTED_PROXIES:-}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
       - ./config/caddy-includes/:/etc/caddy-includes

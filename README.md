@@ -457,6 +457,41 @@ so after one visit over a trusted certificate, browsers refuse plain HTTP to
 `WALDUR_DOMAIN` for a year. They ignore the header when the certificate is not
 trusted, as with `TLS=internal` without its CA installed.
 
+## Behind a load balancer
+
+Caddy normally replaces `X-Forwarded-For` with the address that connected to
+it. That is right when clients connect to Caddy directly, but behind a load
+balancer every request then comes from the balancer's address, and Waldur's
+sign-in lockout and its limit on failed passwords per address treat all users
+as one client.
+
+To keep the client address the balancer reports:
+
+1. Make Caddy keep the balancer's `X-Forwarded-For` entries: set
+   `CADDY_TRUSTED_PROXIES` in `.env` to the balancer's addresses or CIDR
+   ranges, space-separated. Caddy then passes the header on with the
+   balancer's address appended.
+2. Tell Waldur that two proxies add an entry, in
+   `config/waldur-mastermind/override.conf.py`:
+
+   ```python
+   WALDUR_CORE["TRUSTED_PROXY_COUNT"] = 2
+   ```
+
+3. Recreate the containers: `docker compose up -d`.
+
+List only the balancer. A range that also covers clients, such as
+`private_ranges` on a network where users sit, lets those clients choose the
+address Waldur sees, and so the address the lockout counts against. Make
+Caddy reachable only through the balancer for the same reason.
+
+Some features read the first `X-Forwarded-For` entry instead: the network
+restrictions of personal access tokens, organization access subnets, and the
+address in the event log. Once Caddy keeps the incoming header, that entry is
+whatever the client sent if the balancer appends to the header rather than
+replacing it. If you rely on those features, have the balancer replace the
+header.
+
 ## Content-Security-Policy
 
 The homeport image sends the portal's Content-Security-Policy (CSP) on every
