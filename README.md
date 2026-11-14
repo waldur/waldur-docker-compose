@@ -522,16 +522,19 @@ trusted, as with `TLS=internal` without its CA installed.
 
 Caddy normally replaces `X-Forwarded-For` with the address that connected to
 it. That is right when clients connect to Caddy directly, but behind a load
-balancer every request then comes from the balancer's address, and Waldur's
-sign-in lockout and its limit on failed passwords per address treat all users
-as one client.
+balancer every request then comes from the balancer's address. Waldur's limit
+on failed passwords per address then treats all users as one client: after
+`PASSWORD_FAILURES_PER_ADDRESS_LIMIT` failures from anyone, password sign-in is
+blocked for everyone for the cool-off period. (The account lockout counts per
+username and is not affected.)
 
-To keep the client address the balancer reports:
+To pass on the client address the balancer reports:
 
-1. Make Caddy keep the balancer's `X-Forwarded-For` entries: set
-   `CADDY_TRUSTED_PROXIES` in `.env` to the balancer's addresses or CIDR
-   ranges, space-separated. Caddy then passes the header on with the
-   balancer's address appended.
+1. Set `CADDY_TRUSTED_PROXIES` in `.env` to the balancer's addresses or CIDR
+   ranges, space-separated. Caddy then takes the client from the balancer's
+   `X-Forwarded-For` entry, reading the header from the right and skipping
+   only trusted proxies, and sends Waldur that address followed by the
+   balancer's. Entries a client wrote itself are dropped.
 2. Tell Waldur that two proxies add an entry, in
    `config/waldur-mastermind/override.conf.py`:
 
@@ -553,24 +556,25 @@ To keep the client address the balancer reports:
    when their profiles are on. The one-shot services read the file on their
    next run.
 
-List only the balancer. A range that also covers clients, such as
-`private_ranges` on a network where users sit, lets those clients choose the
-address Waldur sees, and so the address the lockout counts against.
+Check it: after a failed sign-in, **Django admin → Axes → Access attempts**
+shows your own address, not the balancer's.
+
+List only the balancer. Caddy believes whatever a trusted proxy puts in the
+header, so a range that also covers clients, such as `private_ranges` on a
+network where users sit, lets those clients choose the address Waldur sees.
 
 Make Caddy reachable only through the balancer as well. A client that connects
 to Caddy directly is not trusted, so its request reaches Waldur with a single
 `X-Forwarded-For` entry, its own address. With `TRUSTED_PROXY_COUNT` at 2 that
 is one entry too few, and Waldur falls back to the address the request came
 from, which is Caddy's container: every client that bypasses the balancer then
-shares one address for the lockout.
+shares one address for the limit.
 
-Some features read the first `X-Forwarded-For` entry instead: the network
-restrictions of personal access tokens, organization access subnets, the
-network rules that hide marketplace resources, and the address in the event
-log. Once Caddy keeps the incoming header, that entry is
-whatever the client sent if the balancer appends to the header rather than
-replacing it. If you rely on those features, have the balancer replace the
-header.
+Because Caddy sends only the resolved address, the features that read the
+first `X-Forwarded-For` entry rather than counting from the right see the
+same client: the network restrictions of personal access tokens, organization
+access subnets, the network rules that hide marketplace resources, and the
+address in the event log.
 
 ## Content-Security-Policy
 
