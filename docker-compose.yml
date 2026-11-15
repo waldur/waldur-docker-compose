@@ -305,11 +305,8 @@ services:
     restart: always
     extra_hosts: *default-mastermind-hosts
 
-  # Remote MCP server (`mcp` profile). AI agent clients reach it at /mcp through
-  # config/caddy-includes/mcp.conf; it answers 404 until the MCP_ENABLED
-  # setting is on. Only what Django needs to start, not the shared mastermind
-  # volumes: it answers anyone on the internet, and those carry the Docker
-  # socket (root on the host), SSH and SAML keys it has no use for.
+  # Remote MCP server. Settings files only, not the shared volumes: it faces the
+  # internet, and those carry the Docker socket (root on the host).
   waldur-mastermind-mcp:
     container_name: waldur-mastermind-mcp
     image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
@@ -325,8 +322,7 @@ services:
         condition: service_healthy
       waldur-mastermind-api:
         condition: service_started
-    # The command binds to 127.0.0.1 unless told otherwise. Each database
-    # thread holds one Postgres connection, counted against max_connections.
+    # Binds to 127.0.0.1 unless told otherwise.
     command: ["waldur", "mcp_server", "--host", "0.0.0.0", "--port", "8091", "--db-threads", "${WALDUR_MCP_DB_THREADS:-4}"]
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8091/health', timeout=5)"]
