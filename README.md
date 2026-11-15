@@ -797,9 +797,10 @@ sign-in needs later mastermind and homeport images.
    which staff turn on when editing the user.
 
 3. Check that `HOMEPORT_URL`, under **Administration → User interface →
-   Branding**, is the portal's address, `https://<WALDUR_DOMAIN>/`. The OAuth
-   sign-in sends the browser to the consent page there, and the default,
-   `https://example.com/`, leads elsewhere.
+   Branding**, is the portal's address, `https://<WALDUR_DOMAIN>/`, with the
+   port if `WALDUR_HTTPS_PORT` is not 443. The OAuth sign-in sends the browser
+   to the consent page there, and the default, `https://example.com/`, leads
+   elsewhere.
 
 The server holds up to `WALDUR_MCP_DB_THREADS` Postgres connections (4 by
 default), one per database thread. They count against Postgres's
