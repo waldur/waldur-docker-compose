@@ -305,6 +305,37 @@ services:
     restart: always
     extra_hosts: *default-mastermind-hosts
 
+  # Remote MCP server (`mcp` profile). AI agent clients reach it at /mcp through
+  # config/caddy-includes/mcp.conf; it answers 404 until the MCP_ENABLED
+  # setting is on. Only what Django needs to start, not the shared mastermind
+  # volumes: it answers anyone on the internet, and those carry the Docker
+  # socket (root on the host), SSH and SAML keys it has no use for.
+  waldur-mastermind-mcp:
+    container_name: waldur-mastermind-mcp
+    image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    logging: *default-logging
+    profiles: [mcp]
+    user: 1001:${DOCKER_GROUP_ID}
+    environment: *default-mastermind-env
+    volumes:
+      - ${CONFIG_FOLDER}/waldur-mastermind/override.conf.py:/etc/waldur/override.conf.py
+      - ${CONFIG_FOLDER}/waldur-mastermind/logging.conf.py:/etc/waldur/logging.conf.py
+    depends_on:
+      waldur-db:
+        condition: service_healthy
+      waldur-mastermind-api:
+        condition: service_started
+    # The command binds to 127.0.0.1 unless told otherwise. Each database
+    # thread holds one Postgres connection, counted against max_connections.
+    command: ["waldur", "mcp_server", "--host", "0.0.0.0", "--port", "8091", "--db-threads", "${WALDUR_MCP_DB_THREADS:-4}"]
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8091/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: always
+    extra_hosts: *default-mastermind-hosts
+
   # HomePort
   waldur-homeport:
     container_name: waldur-homeport
@@ -740,7 +771,7 @@ services:
         - MIX_ERR=true
         - DEBUG=false
         - TIME_ZONE=UTC
-        - INCLUDE=waldur-db,waldur-queue,waldur-mastermind-db-migration,waldur-mastermind-whitelabeling-init,waldur-mastermind-worker,waldur-mastermind-beat,waldur-mastermind-api,waldur-mastermind-web-shell,waldur-homeport,caddy,keycloak,keycloak-db,waldur-matrix-init,waldur-matrix-register,waldur-matrix-bot,tuwunel,livekit,livekit-credentials-check
+        - INCLUDE=waldur-db,waldur-queue,waldur-mastermind-db-migration,waldur-mastermind-whitelabeling-init,waldur-mastermind-worker,waldur-mastermind-beat,waldur-mastermind-api,waldur-mastermind-web-shell,waldur-mastermind-mcp,waldur-homeport,caddy,keycloak,keycloak-db,waldur-matrix-init,waldur-matrix-register,waldur-matrix-bot,tuwunel,livekit,livekit-credentials-check
     volumes:
         - ${LOG_FOLDER}:/srv/logs
         - /var/run/docker.sock:/var/run/docker.sock
