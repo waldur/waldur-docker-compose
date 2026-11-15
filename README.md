@@ -771,6 +771,9 @@ runs the server, and Caddy serves it on the portal's own domain
 The routes are always present. Without the profile, `/mcp` answers 502, and
 the OAuth endpoints answer 404 while `MCP_ENABLED` is off.
 
+Images up to 8.1.5-rc.2 accept only personal access tokens on `/mcp`. OAuth
+sign-in needs later mastermind and homeport images.
+
 1. Start the stack with the profile:
 
    ```bash
