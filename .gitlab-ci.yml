@@ -65,7 +65,7 @@ Test compose configuration:
     - docker images
     - docker compose up waldur-mastermind-db-migration
     - docker compose logs --tail=100 waldur-mastermind-db-migration
-    - docker compose up -d
+    - docker compose --profile mcp up -d
     - docker compose ps
     - docker compose exec waldur-mastermind-worker status
     - docker compose exec waldur-mastermind-worker waldur createstaffuser -u admin -p password -e admin@example.com
@@ -90,6 +90,8 @@ Test compose configuration:
     - 'curl -k -i https://docker/.well-known/oauth-authorization-server | grep -i "content-type: application/json"'
     - 'curl -k -i https://docker/oauth/consent | grep -i "content-type: text/html"'
     - 'if curl -k -s -D - -o /dev/null -X OPTIONS -H "Origin: https://example.org" -H "Access-Control-Request-Method: POST" https://docker/oauth/register/ | grep -i "access-control-allow-credentials"; then echo "Caddy added credentials to /oauth/"; exit 1; fi'
+    # /mcp reaches the MCP server (JSON 404 while MCP_ENABLED is off), not Caddy's 502; retried while it starts
+    - 'curl -k -i --retry 20 --retry-delay 3 -X POST https://docker/mcp | grep -i "content-type: application/json"'
     # /_synapse/admin/ is not proxied to the homeserver: Caddy answers 404 itself
     - 'curl -k -i https://docker/_synapse/admin/v1/register | grep "^HTTP/[0-9.]* 404"'
     # Caddy's own answers carry mastermind's API policy; the portal keeps its own
