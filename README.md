@@ -772,6 +772,12 @@ runs the server, and Caddy serves it on the portal's own domain
 The routes are always present. Without the profile, `/mcp` answers 502, and
 the OAuth endpoints answer 404 while `MCP_ENABLED` is off.
 
+Caddy adds no CORS headers of its own on these paths: the MCP server and the
+API answer with `Access-Control-Allow-Origin: *` and no credentials. Images up
+to 8.1.5-rc.2 send none on `/mcp` and its metadata, so a client that calls
+them from a web page needs a later mastermind image. Clients that call from a
+server, such as Claude, ChatGPT, Cursor and VS Code, are not affected.
+
 Images up to 8.1.5-rc.2 accept only personal access tokens on `/mcp`. OAuth
 sign-in needs later mastermind and homeport images.
 
