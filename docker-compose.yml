@@ -305,6 +305,57 @@ services:
     restart: always
     extra_hosts: *default-mastermind-hosts
 
+  # Remote MCP server. Settings files only, not the shared volumes: it faces the
+  # internet, and those carry the Docker socket (root on the host).
+  waldur-mastermind-mcp:
+    container_name: waldur-mastermind-mcp
+    image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    logging: *default-logging
+    profiles: [mcp]
+    # The image's waldur user and group. DOCKER_GROUP_ID is for the socket this
+    # service doesn't mount, and its default, 0, is the root group.
+    user: "1001:1001"
+    # Only what the server reads, not the shared anchor with its mail, Keycloak
+    # and demo credentials. An allowlist like Helm's waldur.mcp.credentials:
+    # variables added to the anchor later stay out until they are listed here.
+    environment:
+      - GLOBAL_SECRET_KEY=${GLOBAL_SECRET_KEY}
+      - FIELD_ENCRYPTION_KEY=${FIELD_ENCRYPTION_KEY:-}
+      - FIELD_ENCRYPTION_KEY_FALLBACKS=${FIELD_ENCRYPTION_KEY_FALLBACKS:-}
+      - POSTGRESQL_HOST=waldur-db
+      - POSTGRESQL_PASSWORD=${POSTGRESQL_PASSWORD}
+      - RABBITMQ_HOST=waldur-queue
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+      - RABBITMQ_USERNAME=${RABBITMQ_USERNAME}
+      - SENTRY_DSN=${SENTRY_DSN}
+      - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT}
+      - WALDUR_TELEMETRY_ENABLED=${WALDUR_TELEMETRY_ENABLED:-true}
+    volumes:
+      - ${CONFIG_FOLDER}/waldur-mastermind/override.conf.py:/etc/waldur/override.conf.py
+      - ${CONFIG_FOLDER}/waldur-mastermind/logging.conf.py:/etc/waldur/logging.conf.py
+    # As on Helm's MCP pods: nothing writable but /tmp, no capabilities.
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      waldur-db:
+        condition: service_healthy
+      waldur-mastermind-api:
+        condition: service_started
+    # Binds to 127.0.0.1 unless told otherwise.
+    command: ["waldur", "mcp_server", "--host", "0.0.0.0", "--port", "8091", "--db-threads", "${WALDUR_MCP_DB_THREADS:-4}"]
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8091/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: always
+    extra_hosts: *default-mastermind-hosts
+
   # HomePort
   waldur-homeport:
     container_name: waldur-homeport
@@ -740,7 +791,7 @@ services:
         - MIX_ERR=true
         - DEBUG=false
         - TIME_ZONE=UTC
-        - INCLUDE=waldur-db,waldur-queue,waldur-mastermind-db-migration,waldur-mastermind-whitelabeling-init,waldur-mastermind-worker,waldur-mastermind-beat,waldur-mastermind-api,waldur-mastermind-web-shell,waldur-homeport,caddy,keycloak,keycloak-db,waldur-matrix-init,waldur-matrix-register,waldur-matrix-bot,tuwunel,livekit,livekit-credentials-check
+        - INCLUDE=waldur-db,waldur-queue,waldur-mastermind-db-migration,waldur-mastermind-whitelabeling-init,waldur-mastermind-worker,waldur-mastermind-beat,waldur-mastermind-api,waldur-mastermind-web-shell,waldur-mastermind-mcp,waldur-homeport,caddy,keycloak,keycloak-db,waldur-matrix-init,waldur-matrix-register,waldur-matrix-bot,tuwunel,livekit,livekit-credentials-check
     volumes:
         - ${LOG_FOLDER}:/srv/logs
         - /var/run/docker.sock:/var/run/docker.sock

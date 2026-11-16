@@ -190,10 +190,11 @@ checkout` refuses to overwrite them. Keep those changes as commits on a local
 branch instead, and bring each release in with `git merge <new release tag>`,
 resolving any conflict in favour of your settings plus the release's new ones.
 
-With the Matrix chat add-on, set `COMPOSE_PROFILES` in `.env` as described in
-`docs/matrix-chat-add-on.md`, or pass the same `--profile` flags to each of
+With an optional profile on, such as the Matrix chat add-on (see
+`docs/matrix-chat-add-on.md`) or the [MCP server](#mcp-server), list it in
+`COMPOSE_PROFILES` in `.env`, or pass the same `--profile` flags to each of
 these commands. Without the profiles, `pull` and `up -d` neither update nor
-restart the Matrix services.
+restart those services.
 
 ### Config folder changes
 
@@ -542,6 +543,14 @@ To pass on the client address the balancer reports:
    WALDUR_CORE["TRUSTED_PROXY_COUNT"] = 2
    ```
 
+   With the [MCP server](#mcp-server), set the same count for the limit on new
+   OAuth clients, which reads its own setting. At its default of 1, every
+   client's registrations would count against the balancer's address:
+
+   ```python
+   MCP_OAUTH_TRUSTED_PROXY_COUNT = 2
+   ```
+
 3. Apply both. `docker compose up -d` recreates Caddy, whose environment
    changed, but not the mastermind containers: `override.conf.py` is mounted
    from the host, so editing it changes nothing Compose compares, and each
@@ -552,9 +561,9 @@ To pass on the client address the balancer reports:
    docker compose restart waldur-mastermind-api waldur-mastermind-worker waldur-mastermind-beat
    ```
 
-   Add `waldur-mastermind-web-shell` and `waldur-matrix-bot` to the restart
-   when their profiles are on. The one-shot services read the file on their
-   next run.
+   Add `waldur-mastermind-web-shell`, `waldur-matrix-bot` and
+   `waldur-mastermind-mcp` to the restart when their profiles are on. The
+   one-shot services read the file on their next run.
 
 Check it: after a failed sign-in, **Django admin → Axes → Access attempts**
 shows your own address, not the balancer's.
@@ -745,6 +754,77 @@ docker compose --profile web-shell up -d
 ```
 
 Caddy routes `/webshell/` to the `waldur-mastermind-web-shell` service (`config/caddy-includes/web-shell.conf`). That service mounts only the settings files: it deliberately has no access to the Docker socket, so a shell session cannot control the host.
+
+## MCP server
+
+AI agent clients, such as Claude, ChatGPT, Cursor or VS Code, can connect to
+Waldur over the Model Context Protocol and act as the signed-in user, with a
+personal access token or by signing in with OAuth. The optional `mcp` profile
+runs the server, and Caddy serves it on the portal's own domain
+(`config/caddy-includes/mcp.conf`):
+
+- `/mcp` and `/.well-known/oauth-protected-resource/mcp` go to the
+  `waldur-mastermind-mcp` service;
+- `/.well-known/oauth-authorization-server` and the OAuth endpoints under
+  `/oauth/` go to the API. The consent page, `/oauth/consent`, stays with the
+  portal.
+
+The routes are always present. Without the profile, `/mcp` answers 502, and
+the OAuth endpoints answer 404 while `MCP_ENABLED` is off.
+
+Images up to 8.1.5-rc.2 accept only personal access tokens on `/mcp`. OAuth
+sign-in needs later mastermind and homeport images.
+
+1. Start the stack with the profile:
+
+   ```bash
+   docker compose --profile mcp up -d
+   ```
+
+   Or add `mcp` to `COMPOSE_PROFILES` in `.env`, so that every
+   `docker compose` command, upgrades included, also updates the service.
+
+2. As staff, open **Administration → Configuration → Personal access
+   tokens** in the portal and, in the **MCP server** group:
+   - turn on `MCP_ENABLED`;
+   - set `MCP_RESOURCE_URLS` to the endpoint's public URL,
+     `https://<WALDUR_DOMAIN>/mcp`, with the port if `WALDUR_HTTPS_PORT` is
+     not 443. While it is empty, no OAuth token is issued, so clients can
+     connect only with a personal access token.
+
+   Personal access tokens also need `PAT_ENABLED`, on the same page, and
+   each user who creates one needs the **Personal access tokens** option,
+   which staff turn on when editing the user.
+
+3. Check that `HOMEPORT_URL`, under **Administration → User interface →
+   Branding**, is the portal's address, `https://<WALDUR_DOMAIN>/`, with the
+   port if `WALDUR_HTTPS_PORT` is not 443. The OAuth sign-in sends the browser
+   to the consent page there, and the default, `https://example.com/`, leads
+   elsewhere.
+
+The service faces the internet, so it gets less than the other mastermind
+containers:
+
+- of the settings files, only `override.conf.py` and `logging.conf.py`, and
+  not the Docker socket;
+- of the environment, only the database, RabbitMQ, the secret and field
+  encryption keys, Sentry and telemetry. Not the mail, Keycloak or demo
+  preset credentials;
+- a read-only filesystem apart from `/tmp`, no Linux capabilities, no
+  privilege escalation, and the image's own user and group instead of
+  `DOCKER_GROUP_ID`.
+
+Secrets written into `override.conf.py` itself, rather than read from the
+environment, still reach it. A variable that `override.conf.py` reads for the
+server must be added to the service's `environment` in
+`docker-compose.override.yml`.
+
+The server holds up to `WALDUR_MCP_DB_THREADS` Postgres connections (4 by
+default), one per database thread. They count against Postgres's
+`max_connections`, 100 by default, on top of the API and Celery.
+
+Behind a load balancer, also set `MCP_OAUTH_TRUSTED_PROXY_COUNT`, as described
+in [Behind a load balancer](#behind-a-load-balancer).
 
 ## Integration with SLURM
 
