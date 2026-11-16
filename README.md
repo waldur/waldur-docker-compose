@@ -802,6 +802,23 @@ sign-in needs later mastermind and homeport images.
    to the consent page there, and the default, `https://example.com/`, leads
    elsewhere.
 
+The service faces the internet, so it gets less than the other mastermind
+containers:
+
+- of the settings files, only `override.conf.py` and `logging.conf.py`, and
+  not the Docker socket;
+- of the environment, only the database, RabbitMQ, the secret and field
+  encryption keys, Sentry and telemetry. Not the mail, Keycloak or demo
+  preset credentials;
+- a read-only filesystem apart from `/tmp`, no Linux capabilities, no
+  privilege escalation, and the image's own user and group instead of
+  `DOCKER_GROUP_ID`.
+
+Secrets written into `override.conf.py` itself, rather than read from the
+environment, still reach it. A variable that `override.conf.py` reads for the
+server must be added to the service's `environment` in
+`docker-compose.override.yml`.
+
 The server holds up to `WALDUR_MCP_DB_THREADS` Postgres connections (4 by
 default), one per database thread. They count against Postgres's
 `max_connections`, 100 by default, on top of the API and Celery.
