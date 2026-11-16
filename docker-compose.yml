@@ -313,7 +313,21 @@ services:
     logging: *default-logging
     profiles: [mcp]
     user: 1001:${DOCKER_GROUP_ID}
-    environment: *default-mastermind-env
+    # Only what the server reads, not the shared anchor with its mail, Keycloak
+    # and demo credentials. An allowlist like Helm's waldur.mcp.credentials:
+    # variables added to the anchor later stay out until they are listed here.
+    environment:
+      - GLOBAL_SECRET_KEY=${GLOBAL_SECRET_KEY}
+      - FIELD_ENCRYPTION_KEY=${FIELD_ENCRYPTION_KEY:-}
+      - FIELD_ENCRYPTION_KEY_FALLBACKS=${FIELD_ENCRYPTION_KEY_FALLBACKS:-}
+      - POSTGRESQL_HOST=waldur-db
+      - POSTGRESQL_PASSWORD=${POSTGRESQL_PASSWORD}
+      - RABBITMQ_HOST=waldur-queue
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+      - RABBITMQ_USERNAME=${RABBITMQ_USERNAME}
+      - SENTRY_DSN=${SENTRY_DSN}
+      - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT}
+      - WALDUR_TELEMETRY_ENABLED=${WALDUR_TELEMETRY_ENABLED:-true}
     volumes:
       - ${CONFIG_FOLDER}/waldur-mastermind/override.conf.py:/etc/waldur/override.conf.py
       - ${CONFIG_FOLDER}/waldur-mastermind/logging.conf.py:/etc/waldur/logging.conf.py
