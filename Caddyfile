@@ -17,15 +17,19 @@
 	# Waldur's call token API (/api/matrix/livekit/) is called by Matrix
 	# clients on any origin, Element among them, and answers with its own
 	# `Access-Control-Allow-Origin: *` and no credentials, preflights included.
-	# So do the OAuth endpoints that MCP clients call from their own origin
-	# (config/caddy-includes/mcp.conf). Echoing the origin with credentials on
-	# top would send two Access-Control-Allow-Origin headers, which browsers
-	# reject.
+	# So do the MCP server and the OAuth endpoints that MCP clients call from
+	# their own origin (config/caddy-includes/mcp.conf). Echoing the origin
+	# with credentials on top would send two Access-Control-Allow-Origin
+	# headers, which browsers reject.
 	@cors_preflight {
 		method OPTIONS
 		not path /api/matrix/livekit/* /oauth/* /.well-known/oauth-authorization-server*
+		not path /mcp* /.well-known/oauth-protected-resource*
 	}
-	@cors_credentialed not path /api/matrix/livekit/* /oauth/* /.well-known/oauth-authorization-server*
+	@cors_credentialed {
+		not path /api/matrix/livekit/* /oauth/* /.well-known/oauth-authorization-server*
+		not path /mcp* /.well-known/oauth-protected-resource*
+	}
 	header @cors_credentialed {
 		Access-Control-Allow-Origin "{args.0}"
 		Vary Origin

@@ -95,6 +95,10 @@ Test compose configuration:
     - '[ "$(curl -k -s -D - -o /dev/null -H "Origin: https://example.org" https://docker/.well-known/oauth-authorization-server | grep -ic "^access-control-allow-origin")" = 1 ]'
     # /mcp reaches the MCP server (JSON 404 while MCP_ENABLED is off), not Caddy's 502; retried while it starts
     - 'curl -k -i --retry 20 --retry-delay 3 -X POST https://docker/mcp | grep -i "content-type: application/json"'
+    # The MCP server answers its own CORS, so Caddy adds none to /mcp or its
+    # metadata: no credentials, and no second Access-Control-Allow-Origin
+    - 'if curl -k -s -D - -o /dev/null -X OPTIONS -H "Origin: https://example.org" -H "Access-Control-Request-Method: POST" https://docker/mcp | grep -i "access-control-allow-credentials"; then echo "Caddy added credentials to /mcp"; exit 1; fi'
+    - 'if curl -k -s -D - -o /dev/null -H "Origin: https://example.org" https://docker/.well-known/oauth-protected-resource/mcp | grep -i "access-control-allow-credentials"; then echo "Caddy added credentials to the MCP metadata"; exit 1; fi'
     # /_synapse/admin/ is not proxied to the homeserver: Caddy answers 404 itself
     - 'curl -k -i https://docker/_synapse/admin/v1/register | grep "^HTTP/[0-9.]* 404"'
     # Caddy's own answers carry mastermind's API policy; the portal keeps its own
