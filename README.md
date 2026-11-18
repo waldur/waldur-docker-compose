@@ -720,7 +720,7 @@ To start Waldur with Keycloak:
 docker compose --profile keycloak up -d
 ```
 
-The default Keycloak admin username is `admin` (set via `KEYCLOAK_ADMIN` in `docker-compose.yml`). Set the admin password via `KEYCLOAK_ADMIN_PASSWORD` in the `.env` file.
+The default Keycloak admin username is `admin` (set via `KC_BOOTSTRAP_ADMIN_USERNAME` in `docker-compose.yml`; it is only applied on the first start, when no admin exists yet). Set the admin password via `KEYCLOAK_ADMIN_PASSWORD` in the `.env` file.
 
 After this, you can login to the admin interface at [https://localhost/auth/admin](https://localhost/auth/admin) and create Waldur users.
 

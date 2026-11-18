@@ -30,8 +30,8 @@ Matrix component versions live in `.env`. Bump them deliberately:
 
 | Variable | Default | Component |
 |---|---|---|
-| `WALDUR_TUWUNEL_IMAGE_TAG` | `v1.9.3` | Tuwunel homeserver — requires 1.7.0+ for Synapse-compatible `registration_shared_secret`. **Kept in lockstep with the Helm chart's `matrixChat.homeserver.imageTag`** — one supported homeserver version across both packaging paths |
-| `WALDUR_LIVEKIT_IMAGE_TAG` | `v1.13.7` | LiveKit SFU |
+| `WALDUR_TUWUNEL_IMAGE_TAG` | `v1.9.4` | Tuwunel homeserver — requires 1.7.0+ for Synapse-compatible `registration_shared_secret`. **Kept in lockstep with the Helm chart's `matrixChat.homeserver.imageTag`** — one supported homeserver version across both packaging paths |
+| `WALDUR_LIVEKIT_IMAGE_TAG` | `v1.13.11` | LiveKit SFU |
 
 Both publish multi-arch (`linux/amd64` and `linux/arm64`) manifests for the pinned tags. Re-check with `docker buildx imagetools inspect <image>:<tag>` after bumps.
 
