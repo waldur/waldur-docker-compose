@@ -127,7 +127,7 @@ services:
   # RabbitMQ
   waldur-queue:
     container_name: waldur-queue
-    image: '${DOCKER_REGISTRY_PREFIX}library/rabbitmq:4.3.5'
+    image: '${DOCKER_REGISTRY_PREFIX}library/rabbitmq:4.3.8'
     logging: *default-logging
     environment:
       - RABBITMQ_DEFAULT_USER=${RABBITMQ_USERNAME}
@@ -425,7 +425,7 @@ services:
 
   keycloak:
     container_name: keycloak
-    image: '${DOCKER_REGISTRY_PREFIX}keycloak/keycloak:26.6.1'
+    image: '${DOCKER_REGISTRY_PREFIX}keycloak/keycloak:26.8.2'
     logging: *default-logging
     profiles: [keycloak]
     restart: always
@@ -439,8 +439,9 @@ services:
       - KC_HTTP_ENABLED=true
       - KC_HTTP_RELATIVE_PATH=/auth
       - KC_HOSTNAME=https://${WALDUR_DOMAIN}/auth
-      - KEYCLOAK_ADMIN=admin
-      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+      - KC_BOOTSTRAP_ADMIN_USERNAME=admin
+      - KC_BOOTSTRAP_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+      - KC_HEALTH_ENABLED=true
     volumes:
       - ./config/keycloak/realm.json:/opt/keycloak/data/import/realm.json
       - ./libraries/waldur-keycloak-mapper-1.4.0.jar:/opt/keycloak/providers/waldur-keycloak-mapper-1.4.0.jar:ro
@@ -448,7 +449,7 @@ services:
       keycloak-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /auth/health/ready HTTP/1.1\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && cat <&3 | grep -q 200"]
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /auth/health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q 200"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -636,7 +637,7 @@ services:
   tuwunel:
     container_name: tuwunel
     profiles: [matrix]
-    image: 'ghcr.io/matrix-construct/tuwunel:${WALDUR_TUWUNEL_IMAGE_TAG:-v1.9.3}'
+    image: 'ghcr.io/matrix-construct/tuwunel:${WALDUR_TUWUNEL_IMAGE_TAG:-v1.9.4}'
     logging: *default-logging
     restart: always
     environment:
@@ -726,7 +727,7 @@ services:
   livekit:
     container_name: livekit
     profiles: [matrix-rtc]
-    image: 'livekit/livekit-server:${WALDUR_LIVEKIT_IMAGE_TAG:-v1.13.7}'
+    image: 'livekit/livekit-server:${WALDUR_LIVEKIT_IMAGE_TAG:-v1.13.11}'
     logging: *default-logging
     restart: always
     depends_on:
