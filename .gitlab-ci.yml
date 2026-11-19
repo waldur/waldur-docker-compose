@@ -9,6 +9,8 @@ include:
     file: "/templates/test/lint-md-files.yml"
   - project: "waldur/waldur-pipelines"
     file: "/templates/deploy/dev-env-update.yml"
+  - project: "waldur/waldur-pipelines"
+    file: "/templates/test/image-vulnerability-scan.yml"
 
 variables:
   DOCKER_REGISTRY_PREFIX: "registry.hpc.ut.ee/mirror/"
@@ -115,6 +117,32 @@ Test compose configuration:
       elif [ "$TRIGGER_PROJECT_NAME" == "waldur-homeport" ]; then
         export WALDUR_HOMEPORT_IMAGE_TAG=${TRIGGER_IMAGE_TAG}
       fi
+
+# Scans every image the stack can run, all profiles and the SLURM overlay
+# included, at the tags .env.example pins. Images come from `compose config`,
+# so a new service or a tag bump is picked up without editing this job.
+# Accepted findings go in .grype.yaml.
+Scan images:
+  extends: .Image vulnerability scan template
+  before_script:
+    - !reference [.Image vulnerability scan template, before_script]
+    - apk add --no-cache docker-cli-compose
+    - cp .env.example .env
+    # Needs no daemon: `config` only resolves the files.
+    - docker compose --profile '*' -f docker-compose.yml -f waldur-slurm-service.yml config --images > "$IMAGE_LIST_FILE"
+  rules:
+    # Release orchestration only bumps and tags; develop and tag runs scan.
+    # Triggered pipelines test someone else's image, not this repo's pins.
+    - if: '$CI_PIPELINE_SOURCE == "pipeline"'
+      when: never
+    - !reference [.Image vulnerability scan template, rules]
+    # An MR that changes an image shows whether the bump cleared the findings.
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - docker-compose.yml
+        - waldur-slurm-service.yml
+        - .env.example
+        - .grype.yaml
 
 # Override default rules so the job runs for tags automatically
 Trigger dev env update:
