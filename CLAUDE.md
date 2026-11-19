@@ -161,6 +161,7 @@ CI pulls templates from `waldur/waldur-pipelines`. Jobs:
 | `Trigger dev env update` | tag / default branch | Deploys to the dev environment via `dev-env-update.yml` from waldur-pipelines |
 | `check-merge-compatibility` | MRs | Validates the MR can fast-merge into target |
 | `lint-md-files` | MRs | Markdown lint via shared template |
+| `Scan images` | develop / master / tags / scheduled; MRs touching compose files or `.env.example` | Grype scan of every image `docker compose --profile '*' config --images` lists (SLURM overlay included); fixable High+ findings fail it, `allow_failure`. Accepted findings go in `.grype.yaml` |
 
 When CI runs from a triggered pipeline:
 
