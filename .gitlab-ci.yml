@@ -143,6 +143,7 @@ Scan images:
         - waldur-slurm-service.yml
         - .env.example
         - .grype.yaml
+        - .gitlab-ci.yml
 
 # Override default rules so the job runs for tags automatically
 Trigger dev env update:
