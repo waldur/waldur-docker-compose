@@ -54,6 +54,9 @@ x-mastermind-environment:
   # course account APIs and the invitation webhook. Empty keeps the image
   # default. See .env.example.
   - WALDUR_USER_MANAGEMENT_API_TIMEOUT=${WALDUR_USER_MANAGEMENT_API_TIMEOUT:-}
+  # Days of events (the audit trail) to keep; the worker deletes older ones
+  # daily. Empty or 0 keeps events forever. See .env.example.
+  - WALDUR_EVENT_RETENTION_DAYS=${WALDUR_EVENT_RETENTION_DAYS:-}
   # Native passkeys (FIDO2/WebAuthn), read by override.conf.py. Off until
   # WALDUR_PASSKEY_METHODS names a flow; the relying party ID and origin
   # default to WALDUR_DOMAIN. See .env.example.
