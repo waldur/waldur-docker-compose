@@ -130,7 +130,7 @@ services:
   # RabbitMQ
   waldur-queue:
     container_name: waldur-queue
-    image: '${DOCKER_REGISTRY_PREFIX}library/rabbitmq:4.3.8'
+    image: '${DOCKER_REGISTRY_PREFIX}library/rabbitmq:4.4.1'
     logging: *default-logging
     environment:
       - RABBITMQ_DEFAULT_USER=${RABBITMQ_USERNAME}
