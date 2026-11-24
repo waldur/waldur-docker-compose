@@ -118,9 +118,9 @@ Test compose configuration:
         export WALDUR_HOMEPORT_IMAGE_TAG=${TRIGGER_IMAGE_TAG}
       fi
 
-# Scans every image the stack can run, all profiles and the SLURM overlay
-# included, at the tags .env.example pins. Images come from `compose config`,
-# so a new service or a tag bump is picked up without editing this job.
+# Scans every image the stack can run, all profiles included, at the tags
+# .env.example pins. Images come from `compose config`, so a new service
+# or a tag bump is picked up without editing this job.
 # Accepted findings go in .grype.yaml.
 Scan images:
   extends: .Image vulnerability scan template
@@ -129,7 +129,7 @@ Scan images:
     - apk add --no-cache docker-cli-compose
     - cp .env.example .env
     # Needs no daemon: `config` only resolves the files.
-    - docker compose --profile '*' -f docker-compose.yml -f waldur-slurm-service.yml config --images > "$IMAGE_LIST_FILE"
+    - docker compose --profile '*' -f docker-compose.yml config --images > "$IMAGE_LIST_FILE"
   rules:
     # Release orchestration only bumps and tags; develop and tag runs scan.
     # Triggered pipelines test someone else's image, not this repo's pins.
@@ -140,7 +140,6 @@ Scan images:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
         - docker-compose.yml
-        - waldur-slurm-service.yml
         - .env.example
         - .grype.yaml
         - .gitlab-ci.yml

@@ -12,7 +12,6 @@ waldur-docker-compose/
 ├── config/                        # Bind-mounted into containers
 │   ├── waldur-mastermind/         # mastermind config: auth.yaml, marketplace*.yaml, logging.conf.py, ssh keys
 │   ├── waldur-homeport/           # homeport opt/ runtime tree
-│   ├── waldur-slurm-service/      # SLURM site-agent config (when waldur-slurm-service.yml is composed)
 │   ├── keycloak/realm.json        # Keycloak realm import (when keycloak profile is used)
 │   ├── rabbitmq.conf              # RabbitMQ config
 │   ├── rabbitmq-enabled-plugins
@@ -20,7 +19,6 @@ waldur-docker-compose/
 │   └── whitelabeling/             # Branding overrides
 ├── libraries/
 │   └── waldur-keycloak-mapper-*.jar  # Custom Keycloak SPI mapper, loaded by keycloak service
-├── waldur-slurm-service.yml       # Optional compose overlay adding waldur-site-agent for SLURM
 ├── db-upgrade-script.sh           # Automated Postgres major-version upgrade
 └── README.md                      # User-facing operator instructions
 ```
@@ -84,11 +82,6 @@ docker compose down -v
 
 - **Default** (no `--profile`): runs the core 12 services.
 - **`--profile keycloak`**: also starts `keycloak` and `keycloak-db` with the realm in `config/keycloak/realm.json` and the custom mapper jar from `libraries/`.
-- **`--profile slurm`** (via `waldur-slurm-service.yml` overlay):
-
-  ```bash
-  docker compose -f docker-compose.yml -f waldur-slurm-service.yml up -d
-  ```
 
 ## `.env` knobs that matter
 
@@ -161,7 +154,7 @@ CI pulls templates from `waldur/waldur-pipelines`. Jobs:
 | `Trigger dev env update` | tag / default branch | Deploys to the dev environment via `dev-env-update.yml` from waldur-pipelines |
 | `check-merge-compatibility` | MRs | Validates the MR can fast-merge into target |
 | `lint-md-files` | MRs | Markdown lint via shared template |
-| `Scan images` | develop / master / tags / scheduled; MRs touching compose files or `.env.example` | Grype scan of every image `docker compose --profile '*' config --images` lists (SLURM overlay included); fixable High+ findings fail it, `allow_failure`. Accepted findings go in `.grype.yaml` |
+| `Scan images` | develop / master / tags / scheduled; MRs touching compose files or `.env.example` | Grype scan of every image `docker compose --profile '*' config --images` lists; fixable High+ findings fail it, `allow_failure`. Accepted findings go in `.grype.yaml` |
 
 When CI runs from a triggered pipeline:
 
