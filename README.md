@@ -798,9 +798,9 @@ sign-in needs later mastermind and homeport images.
      not 443. While it is empty, no OAuth token is issued, so clients can
      connect only with a personal access token.
 
-   Personal access tokens also need `PAT_ENABLED`, on the same page, and
-   each user who creates one needs the **Personal access tokens** option,
-   which staff turn on when editing the user.
+   Personal access tokens are given to every user by `PAT_ENABLED`, on the
+   same page. While it is off, only users with the **Personal access tokens**
+   option, which staff turn on when editing the user, can create them.
 
 3. Check that `HOMEPORT_URL`, under **Administration → User interface →
    Branding**, is the portal's address, `https://<WALDUR_DOMAIN>/`, with the
