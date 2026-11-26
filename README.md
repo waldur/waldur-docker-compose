@@ -543,13 +543,8 @@ To pass on the client address the balancer reports:
    WALDUR_CORE["TRUSTED_PROXY_COUNT"] = 2
    ```
 
-   With the [MCP server](#mcp-server), set the same count for the limit on new
-   OAuth clients, which reads its own setting. At its default of 1, every
-   client's registrations would count against the balancer's address:
-
-   ```python
-   MCP_OAUTH_TRUSTED_PROXY_COUNT = 2
-   ```
+   This one count covers everything that uses the client address, the
+   [MCP server](#mcp-server) included.
 
 3. Apply both. `docker compose up -d` recreates Caddy, whose environment
    changed, but not the mastermind containers: `override.conf.py` is mounted
@@ -575,15 +570,11 @@ network where users sit, lets those clients choose the address Waldur sees.
 Make Caddy reachable only through the balancer as well. A client that connects
 to Caddy directly is not trusted, so its request reaches Waldur with a single
 `X-Forwarded-For` entry, its own address. With `TRUSTED_PROXY_COUNT` at 2 that
-is one entry too few, and Waldur falls back to the address the request came
-from, which is Caddy's container: every client that bypasses the balancer then
-shares one address for the limit.
-
-Because Caddy sends only the resolved address, the features that read the
-first `X-Forwarded-For` entry rather than counting from the right see the
-same client: the network restrictions of personal access tokens, organization
-access subnets, the network rules that hide marketplace resources, and the
-address in the event log.
+is one entry too few, so Waldur cannot attribute the request to a client.
+Organization access subnets and the network restrictions of personal access
+tokens refuse it, the event log records no address, and the per-address limits
+count it under Caddy's container, so every client that bypasses the balancer
+shares one limit.
 
 ## Content-Security-Policy
 
@@ -829,8 +820,9 @@ The server holds up to `WALDUR_MCP_DB_THREADS` Postgres connections (4 by
 default), one per database thread. They count against Postgres's
 `max_connections`, 100 by default, on top of the API and Celery.
 
-Behind a load balancer, also set `MCP_OAUTH_TRUSTED_PROXY_COUNT`, as described
-in [Behind a load balancer](#behind-a-load-balancer).
+Behind a load balancer, the server takes the client address from
+`TRUSTED_PROXY_COUNT`, as described in
+[Behind a load balancer](#behind-a-load-balancer).
 
 ## Integration with SLURM
 
